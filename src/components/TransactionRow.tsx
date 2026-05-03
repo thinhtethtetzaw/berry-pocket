@@ -1,0 +1,92 @@
+import { View, StyleSheet, Pressable } from 'react-native';
+import { ChevronRight } from 'lucide-react-native';
+import { useTheme } from '../ThemeContext';
+import { palette, radius, space, CATEGORY_BRAND, CATEGORY_PASTEL } from '../theme';
+import { fmt, formatDate } from '../lib/format';
+import type { Transaction } from '../lib/budget';
+import { MAIN_CATEGORIES, SUB_CATEGORIES } from '../lib/budget';
+import { Icon } from './Icon';
+import { Txt } from './Txt';
+
+interface Props {
+  tx: Transaction;
+  onPress?: (tx: Transaction) => void;
+  inline?: boolean;
+}
+
+export function TransactionRow({ tx, onPress, inline }: Props) {
+  const { theme } = useTheme();
+  const main = MAIN_CATEGORIES.find(m => m.id === tx.main);
+  const sub = SUB_CATEGORIES.find(s => s.id === tx.cat);
+  const brand = CATEGORY_BRAND[tx.main];
+  const pastel = CATEGORY_PASTEL[tx.main];
+  const isIncome = main?.type === 'in';
+
+  const wrapStyle = inline
+    ? { paddingVertical: 10 }
+    : {
+        backgroundColor: '#FFFFFF',
+        borderColor: theme.border,
+        borderWidth: 1,
+        borderRadius: radius.xl,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+      };
+
+  return (
+    <Pressable
+      onPress={onPress ? () => onPress(tx) : undefined}
+      style={({ pressed }) => [styles.wrap, wrapStyle, { opacity: pressed ? 0.6 : 1 }]}
+    >
+      <View style={[styles.iconCircle, { backgroundColor: pastel }]}>
+        <Icon name={sub?.icon ?? main?.icon ?? 'Circle'} size={16} color={brand.bg} strokeWidth={2.2} />
+      </View>
+
+      <View style={styles.info}>
+        <Txt variant="bodySmMed" color={theme.ink} numberOfLines={1}>
+          {tx.desc || sub?.label || main?.label}
+        </Txt>
+        <View style={styles.metaRow}>
+          <Txt variant="micro" color={theme.steel}>{main?.label}</Txt>
+          <View style={[styles.dotSep, { backgroundColor: theme.border }]} />
+          <Txt variant="micro" color={theme.steel}>{formatDate(tx.date)}</Txt>
+        </View>
+      </View>
+
+      <Txt
+        variant="bodyMdBold"
+        color={isIncome ? palette.successText : palette.brandCoral}
+      >
+        {isIncome ? '+' : '−'}{fmt(tx.amount, { compact: true })}
+      </Txt>
+
+      {onPress && (
+        <ChevronRight size={14} color={theme.muted} strokeWidth={2} style={{ marginLeft: 2 }} />
+      )}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  iconCircle: {
+    width: 38, height: 38,
+    borderRadius: radius.full,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  info: { flex: 1 },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    gap: 6,
+  },
+  dotSep: {
+    width: 3, height: 3,
+    borderRadius: 2,
+  },
+});
