@@ -1,20 +1,11 @@
 import { View, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext';
-import { palette, radius, space, CATEGORY_BRAND } from '../theme';
+import { palette, radius, space, CATEGORY_GRADIENT, v7Text, v7Surface } from '../theme';
 import { fmt } from '../lib/format';
 import { Icon } from './Icon';
 import { Txt } from './Txt';
 import type { MainCategoryId } from '../lib/budget';
-
-const TILE_GRADIENT: Record<MainCategoryId, readonly [string, string]> = {
-  income:    ['#CCFCE7', '#A3F0CC'],
-  savings:   ['#DFE7FF', '#C4CFFF'],
-  necessary: ['#EDE6FF', '#D8CCFF'],
-  fixed:     ['#ECEFF4', '#D9DEE8'],
-  rosca:     ['#D8EEFF', '#B6D9FF'],
-  living:    ['#FFE4D6', '#FFCDB0'],
-};
 
 interface Props {
   main: MainCategoryId;
@@ -25,10 +16,18 @@ interface Props {
   onPress?: () => void;
 }
 
+/**
+ * v7 pastel-glass allocation tile.
+ * - 2-stop pastel gradient base per category
+ * - 22% white wash overlay (frosted glass feel)
+ * - White IconChip (top-left), percentage badge (top-right)
+ * - Label + spent + "of {budget}" stacked
+ * - Press scales to 0.97 with quick easing
+ */
 export function AllocationTile({ main, label, icon, budget, spent = 0, onPress }: Props) {
-  const { theme } = useTheme();
-  const brand = CATEGORY_BRAND[main];
   const isOver = spent > budget;
+  const pct = budget > 0 ? Math.min(999, Math.round((spent / budget) * 100)) : 0;
+  const [c1, c2] = CATEGORY_GRADIENT[main];
 
   return (
     <Pressable
@@ -36,34 +35,43 @@ export function AllocationTile({ main, label, icon, budget, spent = 0, onPress }
       disabled={!onPress}
       style={({ pressed }) => [
         styles.wrap,
-        { borderColor: theme.border, opacity: pressed ? 0.8 : 1 },
+        { transform: [{ scale: pressed ? 0.97 : 1 }] },
       ]}
     >
       <LinearGradient
-        colors={TILE_GRADIENT[main]}
+        colors={[c1, c2]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      {/* 22% white frosted overlay */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: v7Surface.blurWash }]} />
+      {/* subtle top-left highlight */}
+      <View style={styles.highlight} />
 
       <View style={styles.inner}>
-        {/* Icon */}
-        <View style={styles.iconCircle}>
-          <Icon name={icon} size={17} color={brand.bg} strokeWidth={2.2} />
+        <View style={styles.topRow}>
+          <View style={styles.iconChip}>
+            <Icon name={icon} size={15} color={v7Text.primary} strokeWidth={2} />
+          </View>
+          <Txt variant="caption" color={v7Text.secondary} style={styles.pct}>
+            {pct}%
+          </Txt>
         </View>
 
-        {/* Label */}
-        <Txt variant="bodySmMed" color={theme.ink} style={styles.label}>
+        <Txt variant="bodySmMed" color={v7Text.secondary} style={styles.label}>
           {label}
         </Txt>
 
-        {/* Spent amount — hero */}
-        <Txt variant="headingMd" color={isOver ? palette.errorRed : theme.ink} style={styles.amount}>
+        <Txt
+          variant="headingSm"
+          color={isOver ? palette.errorRed : v7Text.primary}
+          style={styles.amount}
+        >
           {fmt(spent, { compact: true })}
         </Txt>
 
-        {/* Budget — secondary */}
-        <Txt variant="bodySmMed" color={theme.steel}>
+        <Txt variant="caption" color={v7Text.tertiary}>
           of {fmt(budget, { compact: true })}
         </Txt>
       </View>
@@ -75,27 +83,46 @@ const styles = StyleSheet.create({
   wrap: {
     flex: 1,
     minWidth: '47%',
-    borderRadius: radius.xxxl,
-    borderWidth: 1,
+    borderRadius: radius.xl,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: v7Surface.hairline,
+  },
+  highlight: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radius.xl,
+    // simulate radial highlight in the top-left corner — a single soft
+    // white block fading via gradient would be perfect but we approximate
+    // with a near-transparent overlay
+    backgroundColor: 'rgba(255,255,255,0.10)',
   },
   inner: {
     padding: 14,
     alignItems: 'flex-start',
   },
-  iconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.full,
-    backgroundColor: '#FFFFFF',
+  topRow: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  iconChip: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
   },
+  pct: { fontWeight: '600' as const },
   label: {
-    marginBottom: 2,
+    marginBottom: 1,
   },
   amount: {
-    marginBottom: 2,
+    letterSpacing: -0.5,
+    marginBottom: 1,
   },
 });

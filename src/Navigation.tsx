@@ -2,9 +2,10 @@ import { useRef, useEffect } from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, StyleSheet, Platform, Animated } from 'react-native';
-import { Home, BarChart2, Users, Settings } from 'lucide-react-native';
+import { Home, Receipt, PieChart, Users, Settings } from 'lucide-react-native';
 import { HomeScreen } from './screens/HomeScreen';
 import { TransactionsScreen } from './screens/TransactionsScreen';
+import { StatisticsScreen } from './screens/StatisticsScreen';
 import { RoscaScreen } from './screens/RoscaScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { useTheme } from './ThemeContext';
@@ -12,12 +13,13 @@ import { fontWeight, palette } from './theme';
 
 const Tab = createBottomTabNavigator();
 
-type IconName = 'Home' | 'Activity' | 'ROSCA' | 'Settings';
+type IconName = 'Home' | 'Activity' | 'Statistics' | 'ROSCA' | 'Settings';
 
 const ICON_MAP: Record<IconName, typeof Home> = {
   Home,
-  Activity: BarChart2,
-  ROSCA: Users,
+  Activity:   Receipt,
+  Statistics: PieChart,
+  ROSCA:      Users,
   Settings,
 };
 
@@ -99,14 +101,26 @@ export function Navigation() {
           headerShown: false,
           tabBarShowLabel: true,
           tabBarStyle: {
-            backgroundColor: '#FFFFFF',
-            borderTopColor: theme.border,
-            borderTopWidth: 1,
-            height: Platform.OS === 'ios' ? 84 : 64,
-            paddingTop: 8,
-            paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+            // v7 — floating frosted pill, detached from screen edges
             position: 'absolute',
-            elevation: 0,
+            left: 24,
+            right: 24,
+            bottom: Platform.OS === 'ios' ? 26 : 16,
+            height: 64,
+            paddingTop: 8,
+            paddingBottom: 8,
+            paddingHorizontal: 12,
+            backgroundColor: 'rgba(255,255,255,0.92)',
+            borderTopWidth: 0,
+            borderWidth: 1,
+            borderColor: 'rgba(20,30,60,0.07)',
+            borderRadius: 26,
+            // soft drop shadow
+            shadowColor: '#141E3C',
+            shadowOpacity: 0.08,
+            shadowOffset: { width: 0, height: 8 },
+            shadowRadius: 20,
+            elevation: 8,
           },
           tabBarLabelStyle: {
             fontSize: 10,
@@ -127,6 +141,7 @@ export function Navigation() {
       >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Activity" component={TransactionsScreen} />
+        <Tab.Screen name="Statistics" component={StatisticsScreen} />
         <Tab.Screen name="ROSCA" component={RoscaScreen} />
         <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>

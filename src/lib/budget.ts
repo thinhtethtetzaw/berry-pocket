@@ -5,8 +5,8 @@
 export const DEFAULT_BUDGET = {
   income: 80_000,
   savings: 50_000,
-  necessary: 2_000,
-  living: 14_750,
+  necessary: 3_000,
+  living: 11_750,
 };
 
 export interface FixedItem {
@@ -21,6 +21,7 @@ export const DEFAULT_FIXED: FixedItem[] = [
   { id: 'ai',      label: 'AI Subs',       icon: 'Sparkles',     amount: 2_000 },
   { id: 'util',    label: 'Utilities',     icon: 'Plug',         amount: 2_000 },
   { id: 'bro',     label: 'Brother',       icon: 'Heart',        amount: 1_000 },
+  { id: 'family',  label: 'For my parents',icon: 'Heart',        amount: 2_000 },
   { id: 'rosca',   label: 'ROSCA',         icon: 'Users',        amount: 2_000 },
 ];
 

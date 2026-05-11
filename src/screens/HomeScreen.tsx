@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Pencil } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
 import { palette, radius, space } from '../theme';
-import { useBudget, useFixed, useMonthData, useRosca } from '../lib/storage';
+import { useBudget, useFixed, useMonthData, useRosca, useLastSeenMonth, useTotal } from '../lib/storage';
+import { MonthRolloverModal } from '../components/MonthRolloverModal';
+import { Shimmer } from '../components/Shimmer';
 import { AppHeader } from '../components/AppHeader';
 import { HeroBalance } from '../components/HeroBalance';
 import { AllocationTile } from '../components/AllocationTile';
@@ -24,9 +26,11 @@ import type { Transaction } from '../lib/budget';
 
 export function HomeScreen() {
   const { theme } = useTheme();
+  // Home is always pinned to the current real-world month. Time-travel
+  // lives on the Statistics tab.
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
+  const year  = today.getFullYear();
+  const month = today.getMonth();
 
   const [txSheetOpen, setTxSheetOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -35,10 +39,36 @@ export function HomeScreen() {
   const [budgetCfgOpen, setBudgetCfgOpen] = useState(false);
   const [fixedSheetOpen, setFixedSheetOpen] = useState(false);
 
-  const { transactions, add, update, remove } = useMonthData(year, month);
+  // ── Month rollover modal ──
+  const { lastSeen, mark, loaded: lastSeenLoaded } = useLastSeenMonth();
+  const [rolloverOpen, setRolloverOpen] = useState(false);
+  const currentYYYYMM = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  useEffect(() => {
+    if (!lastSeenLoaded) return;
+    // First app open ever → just mark today, no modal.
+    if (lastSeen === null) {
+      mark(currentYYYYMM);
+      return;
+    }
+    // Same month → nothing to do.
+    if (lastSeen >= currentYYYYMM) return;
+    // The month has flipped since we last saw the user → show the modal.
+    setRolloverOpen(true);
+  }, [lastSeenLoaded, lastSeen, currentYYYYMM]);
+
+  // Compute the *previous* month (the one we'll summarize in the modal).
+  const prevMonthInfo = useMemo(() => {
+    const pm = month === 0 ? 11 : month - 1;
+    const py = month === 0 ? year - 1 : year;
+    return { year: py, month: pm };
+  }, [year, month]);
+
+  const { transactions, add, update, remove, loading } = useMonthData(year, month);
   const { cfg: roscaCfg, update: updateRosca } = useRosca(year, month);
   const { budget, update: updateBudget } = useBudget(year, month);
   const { fixed, update: updateFixed } = useFixed(year, month);
+  const { total } = useTotal();
 
   const totals = useMemo(() => {
     const t = { income: 0, savings: 0, necessary: 0, fixed: 0, rosca: 0, living: 0 };
@@ -48,16 +78,12 @@ export function HomeScreen() {
 
   const totalFixed = fixed.reduce((s, f) => s + f.amount, 0);
   const totalSpent = totals.necessary + totals.living + totals.rosca + totals.fixed + totals.savings;
+  // What will be added to "Total Saved" at end of this month — current
+  // month's savings + necessary contributions. Already live in `totals`.
+  const endOfMonthDelta = totals.savings + totals.necessary;
   const recent = [...transactions].sort((a, b) =>
     b.date.localeCompare(a.date) || b.id - a.id
   ).slice(0, 5);
-
-  function nav(d: number) {
-    let m = month + d, y = year;
-    if (m < 0) { m = 11; y--; }
-    if (m > 11) { m = 0; y++; }
-    setYear(y); setMonth(m);
-  }
 
   function openExpense() { setTxSheetDefault('living'); setEditingTx(null); setTxSheetOpen(true); }
   function openIncome()  { setTxSheetDefault('income'); setEditingTx(null); setTxSheetOpen(true); }
@@ -71,11 +97,20 @@ export function HomeScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <AppHeader year={year} month={month} onPrev={() => nav(-1)} onNext={() => nav(1)} />
+        <AppHeader
+          year={year}
+          month={month}
+          onPrev={() => {}}
+          onNext={() => {}}
+          showMonthNav={false}
+        />
 
         <HeroBalance
           income={budget.income + totals.income}
           spent={totalSpent}
+          totalSaved={total}
+          endOfMonth={endOfMonthDelta}
+          monthIndex={month}
           onAddExpense={openExpense}
           onAddIncome={openIncome}
         />
@@ -148,9 +183,7 @@ export function HomeScreen() {
                   </View>
                   <Txt variant="bodyMd" color={theme.ink} style={{ flex: 1 }}>{item.label}</Txt>
                   <Txt variant="bodyMdBold" color={theme.ink}>{fmt(item.amount, { compact: true })}</Txt>
-                  <Pencil size={11} color={theme.muted} strokeWidth={2} style={{ marginLeft: 6 }} />
                 </Pressable>
-                {i < fixed.length - 1 && <View style={[styles.itemDivider, { backgroundColor: theme.borderSoft }]} />}
               </View>
             ))
           )}
@@ -180,7 +213,7 @@ export function HomeScreen() {
           </View>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       <TransactionSheet
@@ -210,6 +243,16 @@ export function HomeScreen() {
         items={fixed}
         onClose={() => setFixedSheetOpen(false)}
         onSave={updateFixed}
+      />
+
+      <MonthRolloverModal
+        visible={rolloverOpen}
+        prevYear={prevMonthInfo.year}
+        prevMonth={prevMonthInfo.month}
+        onContinue={() => {
+          mark(currentYYYYMM);
+          setRolloverOpen(false);
+        }}
       />
     </SafeAreaView>
   );

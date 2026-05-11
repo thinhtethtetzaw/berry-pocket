@@ -1,7 +1,7 @@
 import { View, ViewStyle, StyleProp, StyleSheet } from 'react-native';
 import { ReactNode } from 'react';
 import { useTheme } from '../ThemeContext';
-import { radius, space } from '../theme';
+import { radius, space, v7Surface } from '../theme';
 
 interface Props {
   children: ReactNode;
@@ -20,18 +20,17 @@ export function Card({ children, style, padding, variant = 'base' }: Props) {
   const isStandardCard = variant === 'base' || variant === 'glass' || variant === 'recommendation';
 
   if (isStandardCard) {
-    const r = variant === 'recommendation' ? radius.xl : radius.xxxl;
-    const p = padding ?? (variant === 'recommendation' ? space.lg : space.xl);
+    // v7: plain card uses #F7F7FB flat fill, no border, no shadow
+    const r = variant === 'recommendation' ? radius.lg : radius.xl;
+    const p = padding ?? (variant === 'recommendation' ? space.lg : space.lg);
 
     return (
       <View
         style={[
-          styles.card,
           {
             borderRadius: r,
             padding: p,
-            backgroundColor: '#FFFFFF',
-            borderColor: theme.border,
+            backgroundColor: v7Surface.plainCard,
           },
           style,
         ]}

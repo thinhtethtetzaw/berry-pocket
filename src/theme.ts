@@ -255,3 +255,57 @@ export const CATEGORY_PASTEL: Record<MainCategoryId, string> = {
   rosca:     '#D8EEFF',  // light sky blue
   living:    '#FFE5DC',  // peach
 };
+
+// ─────────────────────── v7 pastel-glass design system ──────────────────
+//
+// Two-stop pastel gradients per category — used by the new SoftCard /
+// AllocationTile / Necessary Fund hero. Paired with a 22% white blur overlay
+// (handled in components) to produce the frosted-glass look.
+
+export const CATEGORY_GRADIENT: Record<MainCategoryId, readonly [string, string]> = {
+  income:    ['#D7F5DF', '#C9E0FF'], // mint  → sky
+  savings:   ['#C9E0FF', '#DCD0FF'], // sky   → lilac
+  necessary: ['#E2D5FF', '#FBD8E8'], // lilac → blush
+  fixed:     ['#D9F0E2', '#CDEBF5'], // mint  → mint-blue
+  rosca:     ['#CDEBF5', '#D8E4FF'], // mint-blue → periwinkle
+  living:    ['#FCE0D0', '#FFE9C9'], // peach → cream
+};
+
+/** Soft donut-chart palette (calmer than CATEGORY_BRAND saturated tones). */
+export const CHART_PALETTE = {
+  savings:   '#A6C3FF',
+  living:    '#FDD2BD',
+  fixed:     '#C9D5E8',
+  necessary: '#DCC9FF',
+  rosca:     '#BDE3F0',
+} satisfies Record<MainCategoryId, string> | Record<string, string>;
+
+/** v7 layered text colors — softer than pure ink. */
+export const v7Text = {
+  primary:   '#0E1220',
+  secondary: 'rgba(14,18,32,0.62)',
+  tertiary:  'rgba(14,18,32,0.38)',
+  inverse:   '#FFFFFF',
+};
+
+/** v7 surface helpers. */
+export const v7Surface = {
+  bg:        '#FFFFFF',
+  plainCard: '#F7F7FB',   // flat card background
+  pillBg:    '#F4F5FA',   // muted pill / filter bg
+  hairline:  'rgba(20,30,60,0.07)',
+  blurWash:  'rgba(255,255,255,0.22)', // overlay on pastel gradients
+  /** Soft ambient blob colors for PageBackground. */
+  ambient1:  '#C9E0FF', // top-right
+  ambient2:  '#FCE0D0', // bottom-left
+};
+
+/** v7 accent colors. */
+export const v7Accent = {
+  success:    '#3FA67A',
+  successSoft:'#DEF1E6',
+  danger:     '#E66A4A',
+  dangerSoft: '#FCE5DC',
+  fund:       '#A855F7',  // necessary fund — kept as before
+  fundSoft:   '#F1E8FF',
+};

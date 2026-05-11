@@ -1,25 +1,18 @@
+import { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Circle, G } from 'react-native-svg';
 import { useTheme } from '../ThemeContext';
-import { radius, space, palette } from '../theme';
+import { radius, space, CHART_PALETTE, v7Text, v7Surface } from '../theme';
 import { fmt } from '../lib/format';
 import { Txt } from './Txt';
 
-// Pastel tones — same light palette as the allocation tile gradients
-// so the donut reads as the same "representative color" per category.
-const SEGMENT_COLOR: Record<string, string> = {
-  living:    '#FFCDB0',  // warm peach  (tile gradient end)
-  necessary: '#D8CCFF',  // soft lavender (tile gradient end)
-  savings:   '#C4CFFF',  // light periwinkle (tile gradient end)
-  rosca:     '#B6D9FF',  // sky blue tint (tile gradient end)
-  fixed:     '#D9DEE8',  // light slate (tile gradient end)
-};
+const SEGMENT_COLOR: Record<string, string> = CHART_PALETTE;
 
 const LABELS: Record<string, string> = {
   living: 'Living',
   necessary: 'Necessary',
   savings: 'Savings',
-  rosca: 'ROSCA',
+  rosca: 'Circles',
   fixed: 'Fixed',
 };
 
@@ -27,121 +20,144 @@ interface Props {
   income: number;
   totals: { savings: number; necessary: number; living: number; rosca: number; fixed: number };
   size?: number;
+  thickness?: number;
+  /** Center label override (e.g. "TOP" / "LEFT"). */
+  centerLabel?: string;
+  /** Center value override (e.g. "Savings" or a fmt amount). */
+  centerValue?: string;
 }
 
-function polarToXY(cx: number, cy: number, r: number, angleDeg: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-
-function donutPath(cx: number, cy: number, r: number, ir: number, start: number, end: number): string {
-  const gap = 2.5;
-  const s = start + gap / 2;
-  const e = end - gap / 2;
-  if (e <= s) return '';
-  const large = e - s > 180 ? 1 : 0;
-  const p1 = polarToXY(cx, cy, r, s);
-  const p2 = polarToXY(cx, cy, r, e);
-  const p3 = polarToXY(cx, cy, ir, e);
-  const p4 = polarToXY(cx, cy, ir, s);
-  return [
-    `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`,
-    `A ${r} ${r} 0 ${large} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`,
-    `L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)}`,
-    `A ${ir} ${ir} 0 ${large} 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)}`,
-    'Z',
-  ].join(' ');
-}
-
-export function SpendingDonut({ income, totals, size = 160 }: Props) {
-  const { theme } = useTheme();
+/**
+ * Donut chart — animated arc draw-on via SVG stroke-dasharray. Each
+ * segment is a full circle clipped to its arc-length by a dasharray pair.
+ * Progress animates 0 → 1 over 1.1s with cubic ease-out.
+ */
+export function SpendingDonut({
+  income,
+  totals,
+  size = 140,
+  thickness = 20,
+  centerLabel,
+  centerValue,
+}: Props) {
   const cx = size / 2;
   const cy = size / 2;
-  const r  = size * 0.44;
-  const ir = size * 0.28;
+  const r = (size - thickness) / 2;
+  const C = 2 * Math.PI * r;
 
-  // Build segments ordered by size (largest first, looks cleaner)
-  const segments = Object.entries(totals)
-    .map(([key, value]) => ({ key, label: LABELS[key] ?? key, value, color: SEGMENT_COLOR[key] ?? '#ccc' }))
+  // Build segments, sorted by size for visual nicety
+  const segments = (Object.entries(totals) as [keyof typeof totals, number][])
+    .map(([key, value]) => ({
+      key,
+      label: LABELS[key] ?? key,
+      value,
+      color: SEGMENT_COLOR[key] ?? '#ccc',
+    }))
     .filter(s => s.value > 0)
     .sort((a, b) => b.value - a.value);
 
   const total = segments.reduce((s, seg) => s + seg.value, 0);
-  const net   = income - total;
+  const net = income - total;
 
-  let currentAngle = 0;
+  const [progress, setProgress] = useState(0);
+  const rafRef = useRef<number | null>(null);
+
+  // Re-trigger animation whenever total changes
+  useEffect(() => {
+    const start = Date.now();
+    const duration = 1100;
+    const tick = () => {
+      const k = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - k, 3);
+      setProgress(eased);
+      if (k < 1) rafRef.current = requestAnimationFrame(tick) as unknown as number;
+    };
+    setProgress(0);
+    rafRef.current = requestAnimationFrame(tick) as unknown as number;
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [total]);
+
+  // Default center readout: LEFT / remaining (income − spent).
+  // Callers may override with centerLabel + centerValue (e.g. "TOP / Savings").
+  const defaultLabel = 'LEFT';
+  const defaultValue = fmt(Math.abs(net), { compact: true });
+
+  // Compute strokeDasharray + offset for each segment, factoring progress.
+  // We rotate the entire <G> -90deg to start at 12 o'clock.
+  let acc = 0;
   const arcs = segments.map(seg => {
-    const sweep = (seg.value / (total || 1)) * 360;
-    const start = currentAngle;
-    const end   = currentAngle + sweep;
-    currentAngle = end;
-    return { ...seg, start, end };
+    const frac = (seg.value / (total || 1)) * progress;
+    const len = C * frac;
+    const offset = C * (acc / (total || 1));
+    acc += seg.value;
+    return { ...seg, len, offset };
   });
 
   return (
-    <View style={[styles.card, { borderColor: theme.border }]}>
+    <View style={[styles.card]}>
       <View style={styles.row}>
-
-        {/* ── Donut ── */}
         <View style={{ width: size, height: size }}>
           <Svg width={size} height={size}>
-            {total === 0 ? (
+            <G rotation={-90} originX={cx} originY={cy}>
+              {/* track */}
               <Circle
-                cx={cx} cy={cy}
-                r={(r + ir) / 2}
+                cx={cx}
+                cy={cy}
+                r={r}
+                stroke="#EEF1F8"
+                strokeWidth={thickness}
                 fill="none"
-                stroke={theme.border}
-                strokeWidth={r - ir}
               />
-            ) : (
-              arcs.map(arc => (
-                <Path
+              {/* segments */}
+              {arcs.map(arc => (
+                <Circle
                   key={arc.key}
-                  d={donutPath(cx, cy, r, ir, arc.start, arc.end)}
-                  fill={arc.color}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  stroke={arc.color}
+                  strokeWidth={thickness}
+                  fill="none"
+                  strokeDasharray={`${arc.len} ${C - arc.len}`}
+                  strokeDashoffset={-arc.offset}
+                  strokeLinecap="round"
                 />
-              ))
-            )}
+              ))}
+            </G>
           </Svg>
-
           {/* Center readout */}
-          <View style={[styles.center, { width: ir * 2, height: ir * 2, borderRadius: ir, left: cx - ir, top: cy - ir }]}>
-            <Txt variant="micro" color={theme.steel} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
-              Left
+          <View style={[styles.center, { width: size, height: size }]}>
+            <Txt variant="micro" color={v7Text.tertiary} style={styles.eyebrow}>
+              {centerLabel ?? defaultLabel}
             </Txt>
-            <Txt variant="bodyMdBold" color={net >= 0 ? palette.successText : palette.brandCoral}>
-              {fmt(Math.abs(net), { compact: true })}
+            <Txt variant="headingSm" color={v7Text.primary} style={styles.centerValue}>
+              {centerValue ?? defaultValue}
             </Txt>
           </View>
         </View>
 
-        {/* ── Legend ── */}
+        {/* Legend */}
         <View style={styles.legend}>
           {segments.length === 0 ? (
-            <Txt variant="caption" color={theme.muted}>No spending yet</Txt>
+            <Txt variant="caption" color={v7Text.tertiary}>No spending yet</Txt>
           ) : (
-            segments.map(seg => (
-              <View key={seg.key} style={styles.legendRow}>
-                <View style={[styles.dot, { backgroundColor: seg.color }]} />
-                <View style={{ flex: 1 }}>
-                  <Txt variant="caption" color={theme.steel}>{seg.label}</Txt>
-                  <Txt variant="bodySmMed" color={theme.ink}>{fmt(seg.value, { compact: true })}</Txt>
+            segments.map(seg => {
+              const pct = total > 0 ? Math.round((seg.value / total) * 100) : 0;
+              return (
+                <View key={seg.key} style={styles.legendRow}>
+                  <View style={[styles.dot, { backgroundColor: seg.color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Txt variant="bodySmMed" color={v7Text.primary}>{seg.label}</Txt>
+                    <Txt variant="micro" color={v7Text.tertiary} style={{ marginTop: 1 }}>
+                      {fmt(seg.value, { compact: true })}
+                    </Txt>
+                  </View>
+                  <Txt variant="bodySmMed" color={v7Text.secondary}>{pct}%</Txt>
                 </View>
-                <Txt variant="caption" color={theme.muted}>
-                  {total > 0 ? `${Math.round((seg.value / total) * 100)}%` : ''}
-                </Txt>
-              </View>
-            ))
-          )}
-          {/* Income reference line */}
-          {income > 0 && (
-            <View style={[styles.legendRow, styles.incomeRow, { borderTopColor: theme.borderSoft }]}>
-              <View style={[styles.dot, { backgroundColor: '#A3F0CC' }]} />
-              <View style={{ flex: 1 }}>
-                <Txt variant="caption" color={theme.steel}>Income</Txt>
-                <Txt variant="bodySmMed" color={palette.successText}>{fmt(income, { compact: true })}</Txt>
-              </View>
-            </View>
+              );
+            })
           )}
         </View>
       </View>
@@ -151,39 +167,23 @@ export function SpendingDonut({ income, totals, size = 160 }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radius.xxxl,
-    borderWidth: 1,
-    backgroundColor: '#FFFFFF',
+    borderRadius: radius.xl,
+    backgroundColor: v7Surface.plainCard,
     padding: space.lg,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.lg,
+    gap: 18,
   },
   center: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  legend: {
-    flex: 1,
-    gap: 10,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  incomeRow: {
-    marginTop: 4,
-    paddingTop: 10,
-    borderTopWidth: 1,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    flexShrink: 0,
-  },
+  eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
+  centerValue: { marginTop: 2 },
+  legend: { flex: 1, gap: 9 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
 });

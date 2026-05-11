@@ -235,7 +235,8 @@ const styles = StyleSheet.create({
   },
   scheduleDivider: {
     height: 1,
-    marginLeft: space.lg + 32 + space.md,
+    // full width — no left indent
+    marginHorizontal: 0,
   },
   statGrid: {
     flexDirection: "row",

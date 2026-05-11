@@ -1,7 +1,7 @@
 import { View, Pressable, StyleSheet } from 'react-native';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { radius, space } from '../theme';
+import { radius, space, v7Text } from '../theme';
 import { MONTHS_SHORT } from '../lib/format';
 import { Txt } from './Txt';
 
@@ -20,10 +20,10 @@ export function AppHeader({ year, month, onPrev, onNext, title, showMonthNav = t
   return (
     <View style={styles.wrap}>
       <View style={{ flexShrink: 1 }}>
-        <Txt variant="microBold" color={theme.muted} style={styles.eyebrow}>
+        <Txt variant="microBold" color={v7Text.tertiary} style={styles.eyebrow}>
           BERRYPOCKET
         </Txt>
-        <Txt variant="headingMd" color={theme.ink}>
+        <Txt variant="headingMd" color={v7Text.primary} style={styles.title}>
           {title ?? `${MONTHS_SHORT[month]} ${year}`}
         </Txt>
       </View>
@@ -52,7 +52,11 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     textTransform: 'uppercase',
+    letterSpacing: 1.6,
     marginBottom: 4,
+  },
+  title: {
+    letterSpacing: -0.6,
   },
   monthNav: {
     flexDirection: 'row',

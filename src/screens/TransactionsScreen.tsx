@@ -7,13 +7,14 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LogIn, LogOut } from "lucide-react-native";
+import { ArrowUp, ArrowDown } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
 import { palette, radius, space } from "../theme";
 import { useMonthData } from "../lib/storage";
 import { AppHeader } from "../components/AppHeader";
 import { TransactionRow } from "../components/TransactionRow";
 import { TransactionSheet } from "../components/TransactionSheet";
+import { IncomeExpenseSummary } from "../components/IncomeExpenseSummary";
 import { PageBackground } from "../components/PageBackground";
 import { Card } from "../components/Card";
 import { SectionLabel } from "../components/SectionLabel";
@@ -112,31 +113,8 @@ export function TransactionsScreen() {
         />
 
         {/* Summary */}
-        <View style={styles.summaryRow}>
-          <View style={[styles.sumCard, { backgroundColor: "#CCFCE7B3" }]}>
-            <Txt
-              variant="microBold"
-              color={palette.successText}
-              style={styles.sumLabel}
-            >
-              INCOME
-            </Txt>
-            <Txt variant="headingSm" color={palette.successText}>
-              +{fmt(totals.income, { compact: true })}
-            </Txt>
-          </View>
-          <View style={[styles.sumCard, { backgroundColor: "#FFE4D6B3" }]}>
-            <Txt
-              variant="microBold"
-              color={palette.brandCoral}
-              style={styles.sumLabel}
-            >
-              EXPENSE
-            </Txt>
-            <Txt variant="headingSm" color={palette.brandCoral}>
-              −{fmt(totals.expense, { compact: true })}
-            </Txt>
-          </View>
+        <View style={{ marginBottom: space.lg }}>
+          <IncomeExpenseSummary income={totals.income} expense={totals.expense} />
         </View>
 
         {/* Filter pills */}
@@ -222,27 +200,23 @@ export function TransactionsScreen() {
           ))
         )}
 
-        <View style={{ height: Platform.OS === "ios" ? 160 : 140 }} />
+        <View style={{ height: Platform.OS === "ios" ? 180 : 160 }} />
       </ScrollView>
 
       {/* Bottom action bar */}
-      <View
-        style={[
-          styles.bottomBar,
-          { borderTopColor: theme.border, backgroundColor: "#FFFFFF" },
-        ]}
-      >
+      <View style={styles.bottomBar}>
         <Pressable
           onPress={openExpense}
           style={({ pressed }) => [
             styles.actionBtn,
             {
-              backgroundColor: palette.brandCoral,
+              backgroundColor: "#E66A4A",
               opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <LogOut size={16} color="#FFFFFF" strokeWidth={2.4} />
+          <ArrowUp size={14} color="#FFFFFF" strokeWidth={2.4} />
           <Txt variant="buttonMd" color="#FFFFFF">
             Expense
           </Txt>
@@ -252,12 +226,13 @@ export function TransactionsScreen() {
           style={({ pressed }) => [
             styles.actionBtn,
             {
-              backgroundColor: palette.successText,
+              backgroundColor: "#3FA67A",
               opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <LogIn size={16} color="#FFFFFF" strokeWidth={2.4} />
+          <ArrowDown size={14} color="#FFFFFF" strokeWidth={2.4} />
           <Txt variant="buttonMd" color="#FFFFFF">
             Income
           </Txt>
@@ -297,8 +272,9 @@ function FilterPill({
       style={[
         styles.filterPill,
         {
-          backgroundColor: active ? color : "#FFFFFF",
-          borderColor: active ? color : theme.border,
+          // v7 — every active filter pill is solid black, same as "All"
+          backgroundColor: active ? theme.ink : "#F4F5FA",
+          borderColor: active ? theme.ink : "transparent",
         },
       ]}
     >
@@ -365,22 +341,29 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: Platform.OS === "ios" ? 84 : 64,
+    left: 24,
+    right: 24,
+    bottom: Platform.OS === "ios" ? 108 : 90,
+    height: 56,
     flexDirection: "row",
-    gap: space.sm,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    borderTopWidth: 1,
+    gap: 10,
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(20,30,60,0.07)",
+    shadowColor: "#141E3C",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 6,
   },
   actionBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    height: 48,
-    borderRadius: radius.full,
+    gap: 6,
+    borderRadius: 12,
   },
 });

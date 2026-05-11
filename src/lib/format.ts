@@ -1,9 +1,22 @@
-export function fmt(n: number, opts?: { compact?: boolean }): string {
+// Module-level current currency. Components/hooks update this via
+// setFmtCurrency(); fmt() will use it unless an explicit `currency` is passed.
+let _currentCurrency = '฿';
+
+export function setFmtCurrency(c: string) {
+  _currentCurrency = c;
+}
+
+export function getFmtCurrency() {
+  return _currentCurrency;
+}
+
+export function fmt(n: number, opts?: { compact?: boolean; currency?: string }): string {
+  const symbol = opts?.currency ?? _currentCurrency;
   if (opts?.compact && Math.abs(n) >= 1000) {
     const v = n / 1000;
-    return '฿' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'k';
+    return symbol + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'k';
   }
-  return '฿' + Math.round(n).toLocaleString('en-US');
+  return symbol + Math.round(n).toLocaleString('en-US');
 }
 
 export function fmtNumber(n: number): string {
@@ -11,12 +24,12 @@ export function fmtNumber(n: number): string {
 }
 
 export const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
 export const MONTHS_SHORT = [
-  'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec',
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
 export function formatDate(iso: string): string {
