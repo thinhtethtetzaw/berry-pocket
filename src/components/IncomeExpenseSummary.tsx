@@ -1,7 +1,6 @@
 import { View, StyleSheet } from 'react-native';
 import { v7Text, v7Surface, v7Accent } from '../theme';
 import { Txt } from './Txt';
-import { AnimatedNumber } from './AnimatedNumber';
 import { getFmtCurrency } from '../lib/format';
 
 interface Props {
@@ -36,12 +35,9 @@ function SumCard({
       <View style={styles.amountRow}>
         <Txt variant="headingSm" color={color} style={styles.sign}>{sign}</Txt>
         <Txt variant="headingSm" color={color} style={styles.symbol}>{currency}</Txt>
-        <AnimatedNumber
-          value={value}
-          variant="headingSm"
-          color={color}
-          style={styles.number}
-        />
+        <Txt variant="headingSm" color={color} style={styles.number}>
+          {Math.round(value).toLocaleString('en-US')}
+        </Txt>
       </View>
     </View>
   );

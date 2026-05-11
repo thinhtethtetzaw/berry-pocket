@@ -39,6 +39,16 @@ function getRange(preset: RangePreset, custom: Range): Range {
   return custom;
 }
 
+function formatTopTxDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const stripped = new Date(d); stripped.setHours(0, 0, 0, 0);
+  if (stripped.getTime() === today.getTime()) return 'TODAY';
+  if (stripped.getTime() === yesterday.getTime()) return 'YESTERDAY';
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()].toUpperCase()} ${d.getFullYear()}`;
+}
+
 function inRange(tx: DatedTx, r: Range): boolean {
   const txKey = tx.year * 12 + tx.month;
   return txKey >= r.startY * 12 + r.startM && txKey <= r.endY * 12 + r.endM;
@@ -306,18 +316,32 @@ export function StatisticsScreen() {
         {/* Daily spend bar chart — last 7 days of expenses */}
         <DailySpendBars days={dailyBars} avg={dailyAvg} title="Last 7 days" />
 
-        {/* Top transactions for the selected range */}
+        {/* Top transactions — grouped by date, headers as subtitles */}
         {topTxs.length > 0 && (
           <>
             <View style={{ height: space.xl }} />
             <Txt variant="bodyMdBold" color={v7Text.primary} style={styles.sectionTitle}>
               Top transactions
             </Txt>
-            <View style={{ gap: 8 }}>
-              {topTxs.map((tx) => (
-                <TransactionRow key={tx.id} tx={tx} />
+            {Object.entries(
+              topTxs.reduce<Record<string, typeof topTxs>>((acc, tx) => {
+                (acc[tx.date] ??= []).push(tx);
+                return acc;
+              }, {}),
+            )
+              .sort((a, b) => b[0].localeCompare(a[0]))
+              .map(([date, txs]) => (
+                <View key={date} style={{ marginBottom: space.md }}>
+                  <Txt variant="microBold" color={v7Text.tertiary} style={styles.dateGroupHeader}>
+                    {formatTopTxDate(date)}
+                  </Txt>
+                  <View style={{ gap: 8 }}>
+                    {txs.map((tx) => (
+                      <TransactionRow key={tx.id} tx={tx} hideDate />
+                    ))}
+                  </View>
+                </View>
               ))}
-            </View>
           </>
         )}
 
@@ -341,7 +365,7 @@ export function StatisticsScreen() {
                           {w.date}
                         </Txt>
                       </View>
-                      <Txt variant="bodyMdBold" color={palette.brandPurple}>
+                      <Txt variant="bodyMdBold" color={v7Accent.fund}>
                         −{fmt(w.amount, { compact: true })}
                       </Txt>
                       <Pressable onPress={() => confirmDeleteWithdrawal(w.id)} hitSlop={8} style={{ marginLeft: 8 }}>
@@ -371,7 +395,7 @@ export function StatisticsScreen() {
         title="Edit Necessary Fund"
         hint="This is a subset of Total. Editing it doesn't change Total — they're two separate trackers."
         initialValue={fund}
-        accent={palette.brandPurple}
+        accent={v7Accent.fund}
         onClose={() => setEditFundOpen(false)}
         onSave={setFund}
       />
@@ -534,6 +558,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     letterSpacing: -0.3,
     marginBottom: 12,
+  },
+  dateGroupHeader: {
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   topTxRow: {
     flexDirection: 'row',

@@ -1,116 +1,165 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { useState, useMemo } from 'react';
 import {
-  BottomSheetModal,
-  BottomSheetBackdrop,
-  BottomSheetScrollView,
-  BottomSheetBackdropProps,
-} from '@gorhom/bottom-sheet';
-import { X } from 'lucide-react-native';
-import { radius, v7Text, v7Surface, CATEGORY_PASTEL } from '../theme';
+  Modal, View, Pressable, StyleSheet, ScrollView, Dimensions,
+} from 'react-native';
+import { X, Plus, ChevronDown, ChevronUp, Pencil } from 'lucide-react-native';
+import { radius, space, v7Text, v7Surface, CATEGORY_PASTEL } from '../theme';
 import { Txt } from './Txt';
 import { Icon } from './Icon';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '../lib/budget';
+import type { MainCategoryId, SubCategory, MainCategory } from '../lib/budget';
+import { useCustomMains, useCustomSubs, CustomMain } from '../lib/storage';
+
+const SHEET_H = Dimensions.get('window').height - 60;
+const BUILTIN_IDS = new Set(MAIN_CATEGORIES.map(m => m.id));
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  onEditMain: (cat: CustomMain | null) => void;
+  onEditSub: (sub: SubCategory | null, parentMain: string, parentColor?: string) => void;
 }
 
-/**
- * Categories viewer — uses @gorhom/bottom-sheet for a draggable, snap-pointed
- * drawer. Drag the handle up/down to resize, swipe down to dismiss.
- */
-export function CategoriesViewerSheet({ visible, onClose }: Props) {
-  const ref = useRef<BottomSheetModal>(null);
-  const snapPoints = useMemo(() => ['55%', '90%'], []);
+export function CategoriesViewerSheet({ visible, onClose, onEditMain, onEditSub }: Props) {
+  const { customMains } = useCustomMains();
+  const { customSubs } = useCustomSubs();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (visible) ref.current?.present();
-    else ref.current?.dismiss();
-  }, [visible]);
-
-  const renderBackdrop = (props: BottomSheetBackdropProps) => (
-    <BottomSheetBackdrop
-      {...props}
-      appearsOnIndex={0}
-      disappearsOnIndex={-1}
-      opacity={0.35}
-      pressBehavior="close"
-    />
+  const allMains: (MainCategory | CustomMain)[] = useMemo(
+    () => [...MAIN_CATEGORIES, ...customMains],
+    [customMains],
   );
 
-  return (
-    <BottomSheetModal
-      ref={ref}
-      snapPoints={snapPoints}
-      index={1}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      handleIndicatorStyle={S.handleIndicator}
-      backgroundStyle={S.sheetBg}
-      onDismiss={onClose}
-    >
-      <View style={S.header}>
-        <View style={{ flex: 1 }}>
-          <Txt variant="headingSm" color={v7Text.primary}>Categories</Txt>
-          <Txt variant="caption" color={v7Text.tertiary} style={{ marginTop: 2 }}>
-            Built-in · custom categories coming soon
-          </Txt>
-        </View>
-        <Pressable onPress={onClose} hitSlop={10} style={S.iconBtn}>
-          <X size={14} color={v7Text.primary} strokeWidth={2} />
-        </Pressable>
-      </View>
+  function toggle(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
-      <BottomSheetScrollView
-        contentContainerStyle={S.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {MAIN_CATEGORIES.map((m) => {
-          const subs = SUB_CATEGORIES.filter(s => s.main === m.id);
-          return (
-            <View key={m.id} style={S.group}>
-              <View style={S.groupHeader}>
-                <View style={[S.iconChip, { backgroundColor: CATEGORY_PASTEL[m.id] }]}>
-                  <Icon name={m.icon} size={14} color={v7Text.primary} strokeWidth={2} />
-                </View>
-                <Txt variant="bodySmMed" color={v7Text.primary} style={{ flex: 1 }}>
-                  {m.label}
-                </Txt>
-                <Txt variant="caption" color={v7Text.tertiary}>
-                  {subs.length} {subs.length === 1 ? 'item' : 'items'}
-                </Txt>
-              </View>
-              {subs.length > 0 && (
-                <View style={S.subList}>
-                  {subs.map((s) => (
-                    <View key={s.id} style={S.subRow}>
-                      <Icon name={s.icon} size={13} color={v7Text.secondary} strokeWidth={2} />
-                      <Txt variant="caption" color={v7Text.secondary}>{s.label}</Txt>
-                    </View>
-                  ))}
-                </View>
-              )}
+  function subsFor(mainId: string): SubCategory[] {
+    return [
+      ...SUB_CATEGORIES.filter(s => s.main === mainId),
+      ...customSubs.filter(s => s.main === mainId),
+    ];
+  }
+
+  const isCustomSub = (id: string) => customSubs.some(s => s.id === id);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={S.backdrop} onPress={onClose}>
+        <Pressable onPress={() => {}} style={S.sheet}>
+          <Pressable onPress={onClose} style={S.handleArea} hitSlop={8}>
+            <View style={S.handleIndicator} />
+          </Pressable>
+
+          <View style={S.header}>
+            <View style={{ flex: 1 }}>
+              <Txt variant="headingSm" color={v7Text.primary}>Categories</Txt>
+              <Txt variant="caption" color={v7Text.tertiary} style={{ marginTop: 2 }}>
+                {allMains.length} categories · tap to expand
+              </Txt>
             </View>
-          );
-        })}
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+            <Pressable onPress={onClose} hitSlop={10} style={S.iconBtn}>
+              <X size={14} color={v7Text.primary} strokeWidth={2} />
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={S.content}>
+            <Pressable
+              onPress={() => onEditMain(null)}
+              style={({ pressed }) => [S.addBtn, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Plus size={14} color={v7Text.primary} strokeWidth={2.2} />
+              <Txt variant="bodySmMed" color={v7Text.primary}>Add new category</Txt>
+            </Pressable>
+
+            {allMains.map((m) => {
+              const isBuiltin = BUILTIN_IDS.has(m.id as MainCategoryId);
+              const custom = !isBuiltin ? (m as CustomMain) : null;
+              const color = custom?.color ?? v7Text.primary;
+              const pastel = custom?.pastel ?? CATEGORY_PASTEL[m.id as MainCategoryId] ?? '#F5F6FA';
+              const isOpen = expanded.has(m.id);
+              const subs = subsFor(m.id);
+
+              return (
+                <View key={m.id} style={S.group}>
+                  <Pressable onPress={() => toggle(m.id)} style={S.groupHeader}>
+                    <View style={[S.iconChip, { backgroundColor: pastel }]}>
+                      <Icon name={m.icon} size={15} color={color} strokeWidth={2.2} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Txt variant="bodySmMed" color={v7Text.primary}>{m.label}</Txt>
+                        {isBuiltin && (
+                          <View style={S.badge}>
+                            <Txt variant="micro" color={v7Text.tertiary}>built-in</Txt>
+                          </View>
+                        )}
+                      </View>
+                      <Txt variant="micro" color={v7Text.tertiary} style={{ marginTop: 2 }}>
+                        {m.type === 'in' ? 'Income' : 'Expense'} · {subs.length} {subs.length === 1 ? 'sub' : 'subs'}
+                      </Txt>
+                    </View>
+
+                    {!isBuiltin && custom && (
+                      <Pressable onPress={() => onEditMain(custom)} hitSlop={8} style={S.editChip}>
+                        <Pencil size={12} color={v7Text.secondary} strokeWidth={2} />
+                      </Pressable>
+                    )}
+                    {isOpen
+                      ? <ChevronUp size={16} color={v7Text.tertiary} strokeWidth={2} />
+                      : <ChevronDown size={16} color={v7Text.tertiary} strokeWidth={2} />}
+                  </Pressable>
+
+                  {isOpen && (
+                    <View style={S.subList}>
+                      {subs.map((s) => {
+                        const editable = isCustomSub(s.id);
+                        return (
+                          <View key={s.id} style={S.subRow}>
+                            <Icon name={s.icon} size={13} color={color} strokeWidth={2} />
+                            <Txt variant="caption" color={v7Text.primary} style={{ flex: 1 }}>{s.label}</Txt>
+                            {editable && (
+                              <Pressable onPress={() => onEditSub(s, m.id, color)} hitSlop={6}>
+                                <Pencil size={11} color={v7Text.tertiary} strokeWidth={2} />
+                              </Pressable>
+                            )}
+                          </View>
+                        );
+                      })}
+                      <Pressable
+                        onPress={() => onEditSub(null, m.id, color)}
+                        style={({ pressed }) => [S.addSubBtn, { opacity: pressed ? 0.6 : 1 }]}
+                      >
+                        <Plus size={12} color={v7Text.secondary} strokeWidth={2} />
+                        <Txt variant="caption" color={v7Text.secondary}>Add sub-category</Txt>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
 const S = StyleSheet.create({
-  sheetBg: {
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  sheet: {
+    height: SHEET_H,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    paddingBottom: space.md,
   },
-  handleIndicator: {
-    backgroundColor: '#D8DCE5',
-    width: 40,
-    height: 4,
-  },
+  handleArea: { paddingTop: 12, paddingBottom: 8, alignItems: 'center' },
+  handleIndicator: { backgroundColor: '#9AA1AE', width: 48, height: 5, borderRadius: 3 },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -118,47 +167,52 @@ const S = StyleSheet.create({
     paddingBottom: 12,
   },
   iconBtn: {
-    width: 30, height: 30,
-    borderRadius: radius.full,
+    width: 30, height: 30, borderRadius: radius.full,
     backgroundColor: '#F5F6FA',
     alignItems: 'center', justifyContent: 'center',
   },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+  content: { paddingHorizontal: 20, paddingBottom: 60 },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: v7Surface.hairline,
+    marginBottom: 12,
   },
   group: {
     backgroundColor: v7Surface.plainCard,
     borderRadius: 14,
     marginBottom: 10,
-    padding: 12,
+    overflow: 'hidden',
   },
-  groupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  iconChip: {
-    width: 30, height: 30,
-    borderRadius: 9,
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
+  iconChip: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  badge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: '#E9ECF3' },
+  editChip: {
+    width: 26, height: 26, borderRadius: 8,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
   },
   subList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: v7Surface.hairline,
+    paddingHorizontal: 12, paddingTop: 6, paddingBottom: 12,
+    borderTopWidth: 1, borderTopColor: v7Surface.hairline,
+    gap: 8,
   },
   subRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderRadius: 10, backgroundColor: '#FFFFFF',
+  },
+  addSubBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, paddingVertical: 8, borderRadius: 10,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: v7Surface.hairline,
+    marginTop: 2,
   },
 });

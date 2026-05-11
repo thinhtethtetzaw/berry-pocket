@@ -21,8 +21,18 @@ import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
 import { Txt } from '../components/Txt';
 import { PageBackground } from '../components/PageBackground';
-import { fmt } from '../lib/format';
+import { fmt, MONTHS_SHORT } from '../lib/format';
 import type { Transaction } from '../lib/budget';
+
+function formatRecentDateHeader(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const stripped = new Date(d); stripped.setHours(0, 0, 0, 0);
+  if (stripped.getTime() === today.getTime()) return 'TODAY';
+  if (stripped.getTime() === yesterday.getTime()) return 'YESTERDAY';
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()].toUpperCase()}`;
+}
 
 export function HomeScreen() {
   const { theme } = useTheme();
@@ -121,12 +131,14 @@ export function HomeScreen() {
           action={{ label: 'Edit', onPress: () => setBudgetCfgOpen(true) }}
         />
         <View style={styles.grid}>
+          {/* v13 checker pattern — Savings (0) + ROSCA (3) are solid, Necessary (1) + Living (2) are plain. */}
           <AllocationTile
             main="savings"
             label="Savings"
             icon="TrendingUp"
             budget={budget.savings}
             spent={totals.savings}
+            solid
           />
           <AllocationTile
             main="necessary"
@@ -149,6 +161,7 @@ export function HomeScreen() {
             budget={roscaCfg.monthlyPayment}
             spent={totals.rosca}
             onPress={() => setRoscaCfgOpen(true)}
+            solid
           />
         </View>
 
@@ -206,11 +219,26 @@ export function HomeScreen() {
             </View>
           </Card>
         ) : (
-          <View style={{ gap: 8 }}>
-            {recent.map(tx => (
-              <TransactionRow key={tx.id} tx={tx} onPress={openEdit} />
-            ))}
-          </View>
+          /* Group by date — date becomes the section subtitle so individual rows don't repeat it */
+          Object.entries(
+            recent.reduce<Record<string, typeof recent>>((acc, tx) => {
+              (acc[tx.date] ??= []).push(tx);
+              return acc;
+            }, {}),
+          )
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .map(([date, txs]) => (
+              <View key={date} style={{ marginBottom: space.md }}>
+                <Txt variant="microBold" color={theme.steel} style={styles.dateHeader}>
+                  {formatRecentDateHeader(date)}
+                </Txt>
+                <View style={{ gap: 8 }}>
+                  {txs.map(tx => (
+                    <TransactionRow key={tx.id} tx={tx} onPress={openEdit} hideDate />
+                  ))}
+                </View>
+              </View>
+            ))
         )}
 
         <View style={{ height: 120 }} />
@@ -285,6 +313,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: space.lg,
+  },
+  dateHeader: {
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   emptyIcon: {
     width: 48, height: 48,

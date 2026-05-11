@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, View, Pressable, StyleSheet, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { palette, radius, space } from '../theme';
+import { palette, radius, space, v7Accent } from '../theme';
 import { fmt } from '../lib/format';
 import { NumberInput } from './NumberInput';
 import { Txt } from './Txt';
@@ -52,10 +52,10 @@ export function BudgetConfigSheet({ visible, budget, fixedTotal, onClose, onSave
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
               {/* Balance summary */}
-              <View style={[S.summary, { backgroundColor: isOver ? palette.brandCoral + '10' : theme.bgSubtle, borderColor: isOver ? palette.brandCoral + '40' : theme.border }]}>
+              <View style={[S.summary, { backgroundColor: isOver ? v7Accent.danger + '10' : theme.bgSubtle, borderColor: isOver ? v7Accent.danger + '40' : theme.border }]}>
                 <View style={S.sumRow}>
                   <Txt variant="bodySmMed" color={theme.steel}>Unallocated</Txt>
-                  <Txt variant="bodyMdBold" color={isOver ? palette.brandCoral : palette.successText}>
+                  <Txt variant="bodyMdBold" color={isOver ? v7Accent.danger : palette.successText}>
                     {isOver ? '−' : '+'}{fmt(Math.abs(remaining))}
                   </Txt>
                 </View>

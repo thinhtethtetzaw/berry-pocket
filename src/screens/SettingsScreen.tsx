@@ -9,8 +9,15 @@ import {
   Trash2,
   PiggyBank,
   Filter,
+  Upload,
+  Download,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// expo-file-system v19+ moved the legacy `cacheDirectory` API to a separate path.
+// The legacy API is what we want — simple writeAsStringAsync / readAsStringAsync.
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { useState } from 'react';
 import { useTheme } from '../ThemeContext';
 import { space, v7Text, v7Surface, v7Accent } from '../theme';
@@ -18,6 +25,7 @@ import {
   useRosca, useBudget, useFixed,
   useCurrency, useThemePref, useLanguage,
   ThemePref, LangPref,
+  exportAllData, parseImportBundle, importAllData,
 } from '../lib/storage';
 import { DEFAULT_ROSCA, DEFAULT_BUDGET, DEFAULT_FIXED } from '../lib/budget';
 import { fmt } from '../lib/format';
@@ -29,6 +37,10 @@ import { PageBackground } from '../components/PageBackground';
 import { Txt } from '../components/Txt';
 import { OptionPickerSheet } from '../components/OptionPickerSheet';
 import { CategoriesViewerSheet } from '../components/CategoriesViewerSheet';
+import { CategoryEditorSheet } from '../components/CategoryEditorSheet';
+import { SubCategoryEditorSheet } from '../components/SubCategoryEditorSheet';
+import { useCustomMains, useCustomSubs, CustomMain } from '../lib/storage';
+import type { SubCategory } from '../lib/budget';
 
 const CURRENCY_OPTIONS = [
   { id: '฿', label: 'Thai Baht (฿)', sub: 'THB · symbol before' },
@@ -71,7 +83,80 @@ export function SettingsScreen() {
   const [langOpen, setLangOpen]         = useState(false);
   const [catsOpen, setCatsOpen]         = useState(false);
 
+  // Category editor state (hoisted up so editors are siblings of the manager,
+  // not nested — gorhom doesn't reliably handle nested BottomSheetModals)
+  const { upsert: upsertMain, remove: removeMain } = useCustomMains();
+  const { upsert: upsertSub, remove: removeSub } = useCustomSubs();
+  const [mainEditor, setMainEditor] = useState<{ open: boolean; editing: CustomMain | null }>({
+    open: false, editing: null,
+  });
+  const [subEditor, setSubEditor] = useState<{
+    open: boolean; editing: SubCategory | null; parent: string; color?: string;
+  }>({ open: false, editing: null, parent: '' });
+
   const totalFixed = fixed.reduce((s, f) => s + f.amount, 0);
+
+  async function handleExport() {
+    try {
+      const json = await exportAllData();
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const filename = `berrypocket-${stamp}.json`;
+      const uri = FileSystem.cacheDirectory + filename;
+      await FileSystem.writeAsStringAsync(uri, json);
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Export BerryPocket data',
+          UTI: 'public.json',
+        });
+      } else {
+        Alert.alert('Saved', `File saved to: ${uri}`);
+      }
+    } catch (err) {
+      Alert.alert('Export failed', err instanceof Error ? err.message : 'Unknown error');
+    }
+  }
+
+  async function handleImport() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', 'text/plain', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const file = result.assets?.[0];
+      if (!file) return;
+
+      const raw = await FileSystem.readAsStringAsync(file.uri);
+      const bundle = parseImportBundle(raw);
+
+      const txCount = Object.keys(bundle.data).filter(k => k.startsWith('bb:month:')).length;
+      const exportedDate = new Date(bundle.exportedAt).toLocaleString();
+
+      Alert.alert(
+        'Import this backup?',
+        `Exported: ${exportedDate}\nMonths of transactions: ${txCount}\n\nThis will OVERWRITE your current data. This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Replace all',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await importAllData(bundle);
+                Alert.alert('Imported', 'Your data was restored from the backup.');
+              } catch (err) {
+                Alert.alert('Import failed', err instanceof Error ? err.message : 'Unknown error');
+              }
+            },
+          },
+        ],
+      );
+    } catch (err) {
+      Alert.alert('Import failed', err instanceof Error ? err.message : 'Unknown error');
+    }
+  }
 
   function clearAll() {
     Alert.alert(
@@ -190,6 +275,27 @@ export function SettingsScreen() {
           />
         </View>
 
+        {/* ── Backup ── */}
+        <SectionTitle>Backup</SectionTitle>
+        <View style={styles.group}>
+          <Row
+            icon={<Upload size={14} color={v7Text.primary} strokeWidth={2} />}
+            title="Export data"
+            sub="Save a JSON backup file"
+            onPress={handleExport}
+            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+          />
+          <Hairline />
+          <Row
+            icon={<Download size={14} color={v7Text.primary} strokeWidth={2} />}
+            title="Import data"
+            sub="Restore from a JSON backup"
+            onPress={handleImport}
+            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            last
+          />
+        </View>
+
         {/* ── Data ── */}
         <SectionTitle>Data</SectionTitle>
         <View style={styles.group}>
@@ -265,6 +371,28 @@ export function SettingsScreen() {
       <CategoriesViewerSheet
         visible={catsOpen}
         onClose={() => setCatsOpen(false)}
+        onEditMain={(editing) => setMainEditor({ open: true, editing })}
+        onEditSub={(editing, parent, color) =>
+          setSubEditor({ open: true, editing, parent, color })
+        }
+      />
+
+      <CategoryEditorSheet
+        visible={mainEditor.open}
+        editing={mainEditor.editing}
+        onClose={() => setMainEditor({ open: false, editing: null })}
+        onSave={(cat) => upsertMain(cat)}
+        onDelete={mainEditor.editing ? (id) => removeMain(id) : undefined}
+      />
+
+      <SubCategoryEditorSheet
+        visible={subEditor.open}
+        parentMain={subEditor.parent}
+        parentColor={subEditor.color}
+        editing={subEditor.editing}
+        onClose={() => setSubEditor({ open: false, editing: null, parent: '' })}
+        onSave={(sub) => upsertSub(sub)}
+        onDelete={subEditor.editing ? (id) => removeSub(id) : undefined}
       />
     </SafeAreaView>
   );

@@ -227,23 +227,25 @@ export const type = {
   bodyMdBold:  { size: 15, lh: 1.50, ls: 0,     family: fontFamily.bold },
   bodySm:      { size: 13, lh: 1.50, ls: 0,     family: fontFamily.regular },
   bodySmMed:   { size: 13, lh: 1.50, ls: 0,     family: fontFamily.medium },
-  caption:     { size: 12, lh: 1.50, ls: 0,     family: fontFamily.regular },
-  captionBold: { size: 12, lh: 1.40, ls: 0.3,   family: fontFamily.semibold },
-  micro:       { size: 11, lh: 1.50, ls: 0.4,   family: fontFamily.regular },
-  microBold:   { size: 11, lh: 1.40, ls: 1.5,   family: fontFamily.semibold }, // eyebrow caps
+  caption:     { size: 14, lh: 1.50, ls: 0,     family: fontFamily.regular },
+  captionBold: { size: 14, lh: 1.40, ls: 0.3,   family: fontFamily.semibold },
+  micro:       { size: 13, lh: 1.50, ls: 0.4,   family: fontFamily.regular },
+  microBold:   { size: 13, lh: 1.40, ls: 1.5,   family: fontFamily.semibold }, // eyebrow caps
   buttonMd:    { size: 14, lh: 1.40, ls: 0,     family: fontFamily.semibold },
 };
 
 // ─────────────────────────────── Category Colors ─────────────────────────
 import type { MainCategoryId } from './lib/budget';
 
+// v13 — readable accent colors that work as icon tints on slate backgrounds,
+// while staying in the same warm family as CATEGORY_SOLID / CATEGORY_GRADIENT.
 export const CATEGORY_BRAND: Record<MainCategoryId, { bg: string; on: string }> = {
-  income:    { bg: palette.successText,  on: palette.on }, // emerald
-  savings:   { bg: palette.brandBlue,    on: palette.on }, // electric blue
-  necessary: { bg: palette.brandPurple,  on: palette.on }, // purple
-  fixed:     { bg: palette.ink,          on: palette.on }, // black
-  rosca:     { bg: '#3B9EFF',             on: palette.on }, // sky blue
-  living:    { bg: palette.brandCoral,   on: palette.on }, // coral
+  income:    { bg: palette.successText,  on: palette.on }, // emerald — unchanged
+  savings:   { bg: '#D85277',            on: palette.on }, // rose (was electric blue)
+  necessary: { bg: '#7B66E0',            on: palette.on }, // lavender (was bright purple)
+  fixed:     { bg: '#64748B',            on: palette.on }, // slate
+  rosca:     { bg: '#C99423',            on: palette.on }, // gold (was sky blue)
+  living:    { bg: '#E0814A',            on: palette.on }, // deeper peach
 };
 
 /** Soft pastel tints for light-mode quick-action tiles. */
@@ -262,23 +264,41 @@ export const CATEGORY_PASTEL: Record<MainCategoryId, string> = {
 // AllocationTile / Necessary Fund hero. Paired with a 22% white blur overlay
 // (handled in components) to produce the frosted-glass look.
 
+// v13 — warm pastel family (Savings is now blush rose, ROSCA is butter cream)
 export const CATEGORY_GRADIENT: Record<MainCategoryId, readonly [string, string]> = {
   income:    ['#D7F5DF', '#C9E0FF'], // mint  → sky
-  savings:   ['#C9E0FF', '#DCD0FF'], // sky   → lilac
+  savings:   ['#F6DDE4', '#F2C8D6'], // blush rose
   necessary: ['#E2D5FF', '#FBD8E8'], // lilac → blush
   fixed:     ['#D9F0E2', '#CDEBF5'], // mint  → mint-blue
-  rosca:     ['#CDEBF5', '#D8E4FF'], // mint-blue → periwinkle
+  rosca:     ['#FBEBC6', '#F5D88E'], // butter cream
   living:    ['#FCE0D0', '#FFE9C9'], // peach → cream
 };
 
-/** Soft donut-chart palette (calmer than CATEGORY_BRAND saturated tones). */
+// v13 bento solid tiles — saturated pastels with dark ink on top
+export const CATEGORY_SOLID: Record<MainCategoryId, string> = {
+  income:    '#A3F0CC', // mint
+  savings:   '#F4B5C5', // blush rose
+  necessary: '#BFAEFE', // lavender
+  living:    '#FCB389', // peach
+  rosca:     '#F5D88E', // butter cream
+  fixed:     '#94A3B8', // slate (unused on tiles)
+};
+
+/** v13 chart palette — warm family. */
 export const CHART_PALETTE = {
-  savings:   '#A6C3FF',
-  living:    '#FDD2BD',
-  fixed:     '#C9D5E8',
-  necessary: '#DCC9FF',
-  rosca:     '#BDE3F0',
+  savings:   '#F4B5C5', // blush rose
+  living:    '#FCB389', // peach
+  fixed:     '#E8C8F0', // light pink-purple
+  necessary: '#BFAEFE', // lavender
+  rosca:     '#F5D88E', // butter cream
 } satisfies Record<MainCategoryId, string> | Record<string, string>;
+
+// v13 tile ink — dark text colors used on the colored bento backgrounds
+export const v7TileInk = {
+  primary:   '#0E1220',
+  secondary: 'rgba(14,18,32,0.55)',
+  tertiary:  'rgba(14,18,32,0.38)',
+};
 
 /** v7 layered text colors — softer than pure ink. */
 export const v7Text = {
@@ -306,6 +326,6 @@ export const v7Accent = {
   successSoft:'#DEF1E6',
   danger:     '#E66A4A',
   dangerSoft: '#FCE5DC',
-  fund:       '#A855F7',  // necessary fund — kept as before
-  fundSoft:   '#F1E8FF',
+  fund:       '#7B66E0',  // v13 lavender (matches necessary accent)
+  fundSoft:   '#EFEBFE',  // soft lavender
 };

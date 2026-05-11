@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { RoscaConfig, Transaction, FixedItem } from './budget';
 import { DEFAULT_ROSCA, DEFAULT_BUDGET, DEFAULT_FIXED } from './budget';
 import { setFmtCurrency } from './format';
@@ -20,6 +20,9 @@ const KEY = {
   currency:        'bb:currency',
   themePref:       'bb:themePref',
   language:        'bb:language',
+  // v1.2 — user-defined categories layered on top of built-ins
+  customMains:     'bb:customMains',
+  customSubs:      'bb:customSubs',
 };
 
 const PREFIX = {
@@ -36,6 +39,8 @@ const CH = {
   currency:     'ch:currency',
   themePref:    'ch:themePref',
   language:     'ch:language',
+  customMains:  'ch:customMains',
+  customSubs:   'ch:customSubs',
 };
 
 // Fired whenever any month transaction list is written, so the
@@ -583,4 +588,202 @@ export function useLanguage() {
   };
 
   return { language: lang, setLanguage };
+}
+
+// ─────────── v1.2 · Custom Categories (user-defined) ───────────
+//
+// Built-in MAIN_CATEGORIES and SUB_CATEGORIES from budget.ts stay
+// hard-coded. The user adds *additional* categories on top via these
+// hooks. Consumers should read from `useAllMainCategories()` /
+// `useAllSubCategories()` to get the merged list.
+
+import type { MainCategory, MainCategoryId, SubCategory } from './budget';
+import { MAIN_CATEGORIES, SUB_CATEGORIES } from './budget';
+
+export interface CustomMain extends MainCategory {
+  /** Hex color used in pickers / pastel tints. */
+  color: string;
+  /** Optional override for the pastel tint background. */
+  pastel?: string;
+}
+
+export function useCustomMains() {
+  const [list, setList] = useState<CustomMain[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const refetch = () => {
+      get<CustomMain[]>(KEY.customMains, []).then(v => { if (alive) setList(v); });
+    };
+    refetch();
+    const unsub = subscribe(CH.customMains, refetch);
+    return () => { alive = false; unsub(); };
+  }, []);
+
+  const save = async (next: CustomMain[]) => {
+    setList(next);
+    await set(KEY.customMains, next);
+    emit(CH.customMains);
+  };
+
+  const upsert = (cat: CustomMain) => {
+    const exists = list.some(c => c.id === cat.id);
+    const next = exists ? list.map(c => (c.id === cat.id ? cat : c)) : [...list, cat];
+    return save(next);
+  };
+
+  const remove = (id: string) => save(list.filter(c => c.id !== id));
+
+  return { customMains: list, upsert, remove };
+}
+
+export function useCustomSubs() {
+  const [list, setList] = useState<SubCategory[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const refetch = () => {
+      get<SubCategory[]>(KEY.customSubs, []).then(v => { if (alive) setList(v); });
+    };
+    refetch();
+    const unsub = subscribe(CH.customSubs, refetch);
+    return () => { alive = false; unsub(); };
+  }, []);
+
+  const save = async (next: SubCategory[]) => {
+    setList(next);
+    await set(KEY.customSubs, next);
+    emit(CH.customSubs);
+  };
+
+  const upsert = (sub: SubCategory) => {
+    const exists = list.some(s => s.id === sub.id);
+    const next = exists ? list.map(s => (s.id === sub.id ? sub : s)) : [...list, sub];
+    return save(next);
+  };
+
+  const remove = (id: string) => save(list.filter(s => s.id !== id));
+
+  return { customSubs: list, upsert, remove };
+}
+
+/**
+ * Merged list of built-in + user-defined main categories. Read-only —
+ * consumers that just need to display/select categories should use this.
+ */
+export function useAllMainCategories(): MainCategory[] {
+  const { customMains } = useCustomMains();
+  return useMemo(() => [...MAIN_CATEGORIES, ...customMains], [customMains]);
+}
+
+export function useAllSubCategories(): SubCategory[] {
+  const { customSubs } = useCustomSubs();
+  return useMemo(() => [...SUB_CATEGORIES, ...customSubs], [customSubs]);
+}
+
+// ─────────── v1.2 · Import / Export (JSON backup) ───────────
+//
+// Bundles every `bb:*` key into a single JSON file the user can save off
+// the device. Importing wipes existing data and restores from the file.
+
+const EXPORT_VERSION = 1;
+
+export interface ExportBundle {
+  version: number;
+  exportedAt: string;
+  appVersion: string;
+  data: Record<string, unknown>;
+}
+
+/**
+ * Gather every namespaced key into a single bundle and return as a JSON
+ * string ready for saving / sharing.
+ */
+export async function exportAllData(): Promise<string> {
+  const keys = await AsyncStorage.getAllKeys();
+  const bbKeys = keys.filter(k => k.startsWith('bb:'));
+  const data: Record<string, unknown> = {};
+  for (const k of bbKeys) {
+    const raw = await AsyncStorage.getItem(k);
+    if (raw == null) continue;
+    try {
+      data[k] = JSON.parse(raw);
+    } catch {
+      data[k] = raw; // fallback for non-JSON values
+    }
+  }
+  const bundle: ExportBundle = {
+    version: EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    appVersion: '1.1',
+    data,
+  };
+  return JSON.stringify(bundle, null, 2);
+}
+
+/**
+ * Parse + validate a previously-exported JSON string. Throws if the
+ * structure is wrong so the caller can show a clear error.
+ */
+export function parseImportBundle(raw: string): ExportBundle {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('File is not valid JSON.');
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('File does not look like a BerryPocket export.');
+  }
+  const b = parsed as Partial<ExportBundle>;
+  if (typeof b.version !== 'number' || !b.data || typeof b.data !== 'object') {
+    throw new Error('Missing required fields (version, data).');
+  }
+  if (b.version > EXPORT_VERSION) {
+    throw new Error('This export was made by a newer version of the app.');
+  }
+  return b as ExportBundle;
+}
+
+/**
+ * Restore data from a parsed bundle. Wipes every existing `bb:*` key
+ * first, then writes the bundle's keys, then notifies every hook so
+ * UI refreshes immediately.
+ */
+export async function importAllData(bundle: ExportBundle): Promise<void> {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const bbKeys = allKeys.filter(k => k.startsWith('bb:'));
+  if (bbKeys.length > 0) await AsyncStorage.multiRemove(bbKeys);
+
+  const entries: [string, string][] = [];
+  for (const [k, v] of Object.entries(bundle.data)) {
+    if (!k.startsWith('bb:')) continue; // safety
+    entries.push([k, JSON.stringify(v)]);
+  }
+  if (entries.length > 0) await AsyncStorage.multiSet(entries);
+
+  // Reload the format-currency cache so fmt() picks up the imported value.
+  try {
+    const c = await get<string>(KEY.currency, '฿');
+    setFmtCurrency(c);
+  } catch {}
+
+  // Fire every channel so all hooks refetch from AsyncStorage.
+  //
+  // Different hooks subscribe to different channel names — we must hit
+  // all of them or some screens won't refresh after import.
+  //   useTotal/useNecessaryFund/useNecessaryWithdrawals/useCurrency/
+  //   useThemePref/useLanguage/useCustomMains/useCustomSubs → CH.*
+  //   useRosca/useBudget/useFixed                           → PREFIX.*
+  //   useMonthData                                          → exact key per month
+  //   useAllTransactions                                    → CH_ALL_MONTHS
+  for (const ch of Object.values(CH)) emit(ch);
+  for (const ch of Object.values(PREFIX)) emit(ch);
+  emit(CH_ALL_MONTHS);
+
+  // Emit on every imported month-transactions key so each useMonthData
+  // hook instance (one per visible screen) refetches its own bucket.
+  for (const k of Object.keys(bundle.data)) {
+    if (k.startsWith('bb:month:')) emit(k);
+  }
 }

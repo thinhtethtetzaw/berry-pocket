@@ -1,7 +1,7 @@
 import { View, StyleSheet, Pressable } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { palette, radius, space, CATEGORY_BRAND, CATEGORY_PASTEL } from '../theme';
+import { palette, radius, space, CATEGORY_BRAND, CATEGORY_PASTEL, v7Accent } from '../theme';
 import { fmt, formatDate } from '../lib/format';
 import type { Transaction } from '../lib/budget';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '../lib/budget';
@@ -12,9 +12,11 @@ interface Props {
   tx: Transaction;
   onPress?: (tx: Transaction) => void;
   inline?: boolean;
+  /** If true, hides the date in the meta row (use when rows are grouped by date). */
+  hideDate?: boolean;
 }
 
-export function TransactionRow({ tx, onPress, inline }: Props) {
+export function TransactionRow({ tx, onPress, inline, hideDate }: Props) {
   const { theme } = useTheme();
   const main = MAIN_CATEGORIES.find(m => m.id === tx.main);
   const sub = SUB_CATEGORIES.find(s => s.id === tx.cat);
@@ -38,7 +40,7 @@ export function TransactionRow({ tx, onPress, inline }: Props) {
       onPress={onPress ? () => onPress(tx) : undefined}
       style={({ pressed }) => [styles.wrap, wrapStyle, { opacity: pressed ? 0.6 : 1 }]}
     >
-      <View style={[styles.iconCircle, { backgroundColor: pastel }]}>
+      <View style={[styles.iconCircle, { backgroundColor: '#F5F6FA' }]}>
         <Icon name={sub?.icon ?? main?.icon ?? 'Circle'} size={16} color={brand.bg} strokeWidth={2.2} />
       </View>
 
@@ -48,14 +50,18 @@ export function TransactionRow({ tx, onPress, inline }: Props) {
         </Txt>
         <View style={styles.metaRow}>
           <Txt variant="micro" color={theme.steel}>{main?.label}</Txt>
-          <View style={[styles.dotSep, { backgroundColor: theme.border }]} />
-          <Txt variant="micro" color={theme.steel}>{formatDate(tx.date)}</Txt>
+          {!hideDate && (
+            <>
+              <View style={[styles.dotSep, { backgroundColor: theme.border }]} />
+              <Txt variant="micro" color={theme.steel}>{formatDate(tx.date)}</Txt>
+            </>
+          )}
         </View>
       </View>
 
       <Txt
         variant="bodyMdBold"
-        color={isIncome ? palette.successText : palette.brandCoral}
+        color={isIncome ? palette.successText : v7Accent.danger}
       >
         {isIncome ? '+' : '−'}{fmt(tx.amount, { compact: true })}
       </Txt>

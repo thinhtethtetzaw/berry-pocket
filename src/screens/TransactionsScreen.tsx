@@ -7,7 +7,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ArrowUp, ArrowDown } from "lucide-react-native";
+import { Minus, Plus } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
 import { palette, radius, space } from "../theme";
 import { useMonthData } from "../lib/storage";
@@ -203,39 +203,36 @@ export function TransactionsScreen() {
         <View style={{ height: Platform.OS === "ios" ? 180 : 160 }} />
       </ScrollView>
 
-      {/* Bottom action bar */}
+      {/* Bottom action bar — same pill style as Home page HeroBalance */}
       <View style={styles.bottomBar}>
         <Pressable
           onPress={openExpense}
           style={({ pressed }) => [
-            styles.actionBtn,
+            styles.pill,
             {
-              backgroundColor: "#E66A4A",
+              backgroundColor: theme.ink,
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <ArrowUp size={14} color="#FFFFFF" strokeWidth={2.4} />
-          <Txt variant="buttonMd" color="#FFFFFF">
-            Expense
-          </Txt>
+          <Minus size={16} color="#FFFFFF" strokeWidth={2.4} />
+          <Txt variant="buttonMd" color="#FFFFFF">New Expense</Txt>
         </Pressable>
         <Pressable
           onPress={openIncome}
           style={({ pressed }) => [
-            styles.actionBtn,
+            styles.pill,
+            styles.pillOutline,
             {
-              backgroundColor: "#3FA67A",
-              opacity: pressed ? 0.85 : 1,
+              borderColor: theme.border,
+              opacity: pressed ? 0.7 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <ArrowDown size={14} color="#FFFFFF" strokeWidth={2.4} />
-          <Txt variant="buttonMd" color="#FFFFFF">
-            Income
-          </Txt>
+          <Plus size={16} color={theme.ink} strokeWidth={2.4} />
+          <Txt variant="buttonMd" color={theme.ink}>Income</Txt>
         </Pressable>
       </View>
 
@@ -344,26 +341,22 @@ const styles = StyleSheet.create({
     left: 24,
     right: 24,
     bottom: Platform.OS === "ios" ? 108 : 90,
-    height: 56,
     flexDirection: "row",
-    gap: 10,
-    padding: 6,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(20,30,60,0.07)",
-    shadowColor: "#141E3C",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 16,
-    elevation: 6,
+    gap: space.sm,
+    justifyContent: "center",
   },
-  actionBtn: {
+  pill: {
     flex: 1,
+    maxWidth: 160,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    borderRadius: 12,
+    height: 44,
+    borderRadius: 14,
+  },
+  pillOutline: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
   },
 });

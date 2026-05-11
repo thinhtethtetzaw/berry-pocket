@@ -3,7 +3,7 @@ import { Modal, View, TextInput, Pressable, StyleSheet, ScrollView, Platform, Ke
 import { NumberInput } from './NumberInput';
 import { X, Plus, Trash2, Check } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { palette, radius, space } from '../theme';
+import { palette, radius, space, v7Accent } from '../theme';
 import { fmt } from '../lib/format';
 import type { FixedItem } from '../lib/budget';
 import { Icon } from './Icon';
@@ -119,9 +119,9 @@ export function FixedItemsSheet({ visible, items, onClose, onSave }: Props) {
                             </ScrollView>
 
                             <View style={S.editActions}>
-                              <Pressable onPress={() => remove(item.id)} style={[S.editBtn, { borderColor: palette.brandCoral + '40', backgroundColor: palette.brandCoral + '08' }]}>
-                                <Trash2 size={13} color={palette.brandCoral} strokeWidth={2} />
-                                <Txt variant="caption" color={palette.brandCoral}>Delete</Txt>
+                              <Pressable onPress={() => remove(item.id)} style={[S.editBtn, { borderColor: v7Accent.danger + '40', backgroundColor: v7Accent.danger + '08' }]}>
+                                <Trash2 size={13} color={v7Accent.danger} strokeWidth={2} />
+                                <Txt variant="caption" color={v7Accent.danger}>Delete</Txt>
                               </Pressable>
                               <Pressable onPress={() => setEditingId(null)} style={[S.editBtn, S.editBtnPrimary, { backgroundColor: theme.ink }]}>
                                 <Check size={13} color="#FFFFFF" strokeWidth={2.5} />

@@ -3,7 +3,7 @@ import { Modal, View, Pressable, StyleSheet, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Sparkles, ArrowRight } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { palette, radius, space } from '../theme';
+import { palette, radius, space, v7Accent } from '../theme';
 import { fmt, MONTHS_SHORT } from '../lib/format';
 import { Txt } from './Txt';
 import { SpendingDonut } from './SpendingDonut';
@@ -99,26 +99,26 @@ export function MonthRolloverModal({ visible, prevYear, prevMonth, onContinue }:
             ) : (
               <>
                 {/* Net summary */}
-                <View style={[S.netCard, { backgroundColor: net >= 0 ? '#CCFCE7' : '#FFE4D6' }]}>
-                  <Txt variant="microBold" color={net >= 0 ? palette.successText : palette.brandCoral} style={S.eyebrow}>
+                <View style={[S.netCard, { backgroundColor: net >= 0 ? '#DEF1E6' : '#FCE5DC' }]}>
+                  <Txt variant="microBold" color={net >= 0 ? palette.successText : v7Accent.danger} style={S.eyebrow}>
                     {net >= 0 ? 'NET POSITIVE' : 'NET NEGATIVE'}
                   </Txt>
-                  <Txt variant="headingMd" color={net >= 0 ? palette.successText : palette.brandCoral}>
+                  <Txt variant="headingMd" color={net >= 0 ? palette.successText : v7Accent.danger}>
                     {net >= 0 ? '+' : '−'}{fmt(Math.abs(net), { compact: true })}
                   </Txt>
                 </View>
 
                 {/* Income / Expense pair */}
                 <View style={S.summaryRow}>
-                  <View style={[S.sumCard, { backgroundColor: '#CCFCE7B3' }]}>
+                  <View style={[S.sumCard, { backgroundColor: '#DEF1E6B3' }]}>
                     <Txt variant="microBold" color={palette.successText} style={S.eyebrow}>INCOME</Txt>
                     <Txt variant="bodyMdBold" color={palette.successText}>
                       +{fmt(snap.income, { compact: true })}
                     </Txt>
                   </View>
-                  <View style={[S.sumCard, { backgroundColor: '#FFE4D6B3' }]}>
-                    <Txt variant="microBold" color={palette.brandCoral} style={S.eyebrow}>EXPENSE</Txt>
-                    <Txt variant="bodyMdBold" color={palette.brandCoral}>
+                  <View style={[S.sumCard, { backgroundColor: '#FCE5DCB3' }]}>
+                    <Txt variant="microBold" color={v7Accent.danger} style={S.eyebrow}>EXPENSE</Txt>
+                    <Txt variant="bodyMdBold" color={v7Accent.danger}>
                       −{fmt(totalSpent, { compact: true })}
                     </Txt>
                   </View>
@@ -187,7 +187,7 @@ const S = StyleSheet.create({
     alignSelf: 'center',
     width: 44, height: 44,
     borderRadius: radius.full,
-    backgroundColor: '#CCFCE7',
+    backgroundColor: '#DEF1E6',
     alignItems: 'center', justifyContent: 'center',
   },
   eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },

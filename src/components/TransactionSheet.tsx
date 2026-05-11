@@ -6,7 +6,7 @@ import {
 // full-screen sheet — height removed, flex: 1 used instead
 import { X, Trash2 } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { palette, radius, space } from '../theme';
+import { palette, radius, space, v7Accent } from '../theme';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '../lib/budget';
 import type { MainCategoryId, Transaction } from '../lib/budget';
 import { todayISO } from '../lib/format';
@@ -33,8 +33,8 @@ export function TransactionSheet({ visible, onClose, onSave, editing, onUpdate, 
   const [date, setDate] = useState(todayISO());
   const isEdit = !!editing;
   const isIncome = MAIN_CATEGORIES.find(m => m.id === main)?.type === 'in';
-  const accentColor = isIncome ? palette.successText : palette.brandCoral;
-  const accentBg = isIncome ? '#CCFCE7' : '#FFE4D6';
+  const accentColor = isIncome ? palette.successText : v7Accent.danger;
+  const accentBg = isIncome ? '#DEF1E6' : '#FCE5DC';
 
   useEffect(() => {
     if (!visible) return;
@@ -95,8 +95,8 @@ export function TransactionSheet({ visible, onClose, onSave, editing, onUpdate, 
               </Txt>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {isEdit && onDelete && (
-                  <Pressable onPress={handleDelete} hitSlop={10} style={[S.iconBtn, { backgroundColor: palette.brandCoral + '14' }]}>
-                    <Trash2 size={14} color={palette.brandCoral} strokeWidth={2} />
+                  <Pressable onPress={handleDelete} hitSlop={10} style={[S.iconBtn, { backgroundColor: v7Accent.danger + '14' }]}>
+                    <Trash2 size={14} color={v7Accent.danger} strokeWidth={2} />
                   </Pressable>
                 )}
                 <Pressable onPress={onClose} hitSlop={10} style={[S.iconBtn, { backgroundColor: theme.bgSubtle }]}>
