@@ -8,6 +8,7 @@ import { palette, radius, space, CATEGORY_GRADIENT, CHART_PALETTE, v7Text, v7Sur
 import { DailySpendBars } from '../components/DailySpendBars';
 import { TransactionRow } from '../components/TransactionRow';
 import { IncomeExpenseSummary } from '../components/IncomeExpenseSummary';
+import { DatePickerField } from '../components/DatePickerField';
 import { useTotal, useNecessaryFund, useNecessaryWithdrawals, useAllTransactions } from '../lib/storage';
 import { AppHeader } from '../components/AppHeader';
 import { PageBackground } from '../components/PageBackground';
@@ -417,41 +418,17 @@ export function StatisticsScreen() {
 function MonthYearInput({ year, month, onChange }: {
   year: number; month: number; onChange: (y: number, m: number) => void;
 }) {
-  const { theme } = useTheme();
-  const [yStr, setYStr] = useState(String(year));
-  const [mStr, setMStr] = useState(String(month + 1).padStart(2, '0'));
-
-  function commit() {
-    const y = parseInt(yStr, 10);
-    const m = parseInt(mStr, 10);
-    if (!isNaN(y) && y >= 2000 && y <= 2100 && !isNaN(m) && m >= 1 && m <= 12) {
-      onChange(y, m - 1);
-    } else {
-      setYStr(String(year));
-      setMStr(String(month + 1).padStart(2, '0'));
-    }
-  }
-
+  // Use the native date picker — any day of the picked month sets the
+  // (year, month) range. We always normalize back to the 1st.
+  const iso = `${year}-${String(month + 1).padStart(2, '0')}-01`;
   return (
-    <View style={mySty.row}>
-      <TextInput
-        value={yStr}
-        onChangeText={setYStr}
-        onBlur={commit}
-        keyboardType="number-pad"
-        maxLength={4}
-        style={[mySty.input, { color: theme.ink, borderColor: theme.border, flex: 1.2 }]}
-      />
-      <Txt variant="bodyMdBold" color={theme.muted}>·</Txt>
-      <TextInput
-        value={mStr}
-        onChangeText={setMStr}
-        onBlur={commit}
-        keyboardType="number-pad"
-        maxLength={2}
-        style={[mySty.input, { color: theme.ink, borderColor: theme.border, flex: 1 }]}
-      />
-    </View>
+    <DatePickerField
+      value={iso}
+      onChange={(next) => {
+        const d = new Date(next + 'T00:00:00');
+        onChange(d.getFullYear(), d.getMonth());
+      }}
+    />
   );
 }
 

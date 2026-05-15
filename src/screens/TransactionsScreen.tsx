@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 24,
     right: 24,
-    bottom: Platform.OS === "ios" ? 108 : 90,
+    bottom: 16,
     flexDirection: "row",
     gap: space.sm,
     justifyContent: "center",

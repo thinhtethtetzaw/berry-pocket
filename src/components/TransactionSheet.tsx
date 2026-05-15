@@ -13,6 +13,7 @@ import { todayISO } from '../lib/format';
 import { Icon } from './Icon';
 import { Txt } from './Txt';
 import { categoryAccent } from './categoryAccent';
+import { DatePickerField } from './DatePickerField';
 
 interface Props {
   visible: boolean;
@@ -178,13 +179,7 @@ export function TransactionSheet({ visible, onClose, onSave, editing, onUpdate, 
 
               {/* Date */}
               <FieldLabel label="Date" />
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={theme.muted}
-                style={[S.input, { color: theme.ink, borderColor: theme.border }]}
-              />
+              <DatePickerField value={date} onChange={setDate} />
 
               {/* Actions */}
               <View style={S.actions}>

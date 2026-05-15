@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { Modal, View, Pressable, StyleSheet, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { palette, radius, space } from '../theme';
+import { palette, radius, space, CATEGORY_BRAND } from '../theme';
+
+// ROSCA gold accent — same as the bento solid + brand color
+const ROSCA_ACCENT = CATEGORY_BRAND.rosca.bg; // '#C99423'
 import type { RoscaConfig } from '../lib/budget';
 import { fmt, MONTHS_SHORT } from '../lib/format';
 import { NumberInput } from './NumberInput';
@@ -46,10 +49,10 @@ export function RoscaConfigSheet({ visible, cfg, onClose, onSave }: Props) {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
               {/* Summary */}
-              <View style={[S.summary, { backgroundColor: palette.successText + '10', borderColor: palette.successText + '30' }]}>
+              <View style={[S.summary, { backgroundColor: ROSCA_ACCENT + '14', borderColor: ROSCA_ACCENT + '40' }]}>
                 <View style={S.sumRow}>
                   <Txt variant="micro" color={theme.steel}>You'll receive</Txt>
-                  <Txt variant="bodyMdBold" color={palette.successText}>{fmt(total)}</Txt>
+                  <Txt variant="bodyMdBold" color={ROSCA_ACCENT}>{fmt(total)}</Txt>
                 </View>
                 <View style={S.sumRow}>
                   <Txt variant="micro" color={theme.steel}>Payout month</Txt>

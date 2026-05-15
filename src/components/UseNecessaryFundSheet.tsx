@@ -7,6 +7,7 @@ import { X, AlertTriangle } from 'lucide-react-native';
 import { radius, space, v7Text, v7Surface, v7Accent } from '../theme';
 import { Txt } from './Txt';
 import { todayISO, getFmtCurrency, fmt } from '../lib/format';
+import { DatePickerField } from './DatePickerField';
 
 const SHEET_H = Dimensions.get('window').height - 60;
 // Light purple tint for the fund amount input
@@ -106,13 +107,7 @@ export function UseNecessaryFundSheet({ visible, fundBalance, onClose, onSave }:
               />
 
               <FieldLabel label="Date" />
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={v7Text.tertiary}
-                style={S.input}
-              />
+              <DatePickerField value={date} onChange={setDate} />
 
               <View style={S.actions}>
                 <Pressable onPress={onClose} style={({ pressed }) => [S.btn, S.btnCancel, { opacity: pressed ? 0.6 : 1 }]}>

@@ -2,7 +2,7 @@ import { Alert, View, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Settings2, CheckCircle2, ArrowDownCircle } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { radius, space, CATEGORY_GRADIENT, v7Text, v7Surface, palette } from '../theme';
+import { radius, space, CATEGORY_GRADIENT, v7Text, v7Surface, palette, v7Accent } from '../theme';
 import { fmt } from '../lib/format';
 import { Txt } from './Txt';
 import type { RoscaConfig } from '../lib/budget';
@@ -104,16 +104,21 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
           </Pressable>
         )}
         {received && (
-          <Pressable
-            onPress={confirmUndo}
-            style={({ pressed }) => [
-              styles.receivedBtn,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <CheckCircle2 size={14} color={palette.successText} strokeWidth={2.4} />
-            <Txt variant="bodySmMed" color={palette.successText}>Payout received · undo</Txt>
-          </Pressable>
+          <View style={styles.receivedRow}>
+            <View style={styles.receivedBadge}>
+              <CheckCircle2 size={16} color={palette.successText} strokeWidth={2.4} />
+              <Txt variant="bodySmMed" color={palette.successText}>Payout received</Txt>
+            </View>
+            <Pressable
+              onPress={confirmUndo}
+              style={({ pressed }) => [
+                styles.undoBtn,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Txt variant="bodySmMed" color={v7Text.primary}>Undo</Txt>
+            </Pressable>
+          </View>
         )}
 
         <View style={[styles.divider, { backgroundColor: v7Surface.hairline }]} />
@@ -176,13 +181,29 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: space.md,
   },
-  receivedBtn: {
+  receivedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: space.md,
+  },
+  receivedBadge: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: space.md,
-    paddingVertical: 8,
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: v7Accent.successSoft,
+  },
+  undoBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: v7Surface.hairline,
   },
   divider: { height: 1, marginVertical: space.md },
   meta: {
