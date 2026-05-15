@@ -216,22 +216,22 @@ export const fontSize = {
 
 // Type scale (MiniMax)
 export const type = {
-  heroDisplay: { size: 64, lh: 1.10, ls: -2,    family: fontFamily.semibold },
-  displayLg:   { size: 48, lh: 1.10, ls: -1.5,  family: fontFamily.semibold },
-  headingLg:   { size: 36, lh: 1.20, ls: -1,    family: fontFamily.semibold },
-  headingMd:   { size: 28, lh: 1.25, ls: -0.5,  family: fontFamily.semibold },
-  headingSm:   { size: 22, lh: 1.30, ls: -0.3,  family: fontFamily.semibold },
-  cardTitle:   { size: 18, lh: 1.40, ls: -0.2,  family: fontFamily.semibold },
-  subtitle:    { size: 16, lh: 1.50, ls: 0,     family: fontFamily.medium },
-  bodyMd:      { size: 15, lh: 1.50, ls: 0,     family: fontFamily.regular },
-  bodyMdBold:  { size: 15, lh: 1.50, ls: 0,     family: fontFamily.bold },
-  bodySm:      { size: 13, lh: 1.50, ls: 0,     family: fontFamily.regular },
-  bodySmMed:   { size: 13, lh: 1.50, ls: 0,     family: fontFamily.medium },
-  caption:     { size: 14, lh: 1.50, ls: 0,     family: fontFamily.regular },
-  captionBold: { size: 14, lh: 1.40, ls: 0.3,   family: fontFamily.semibold },
-  micro:       { size: 13, lh: 1.50, ls: 0.4,   family: fontFamily.regular },
-  microBold:   { size: 13, lh: 1.40, ls: 1.5,   family: fontFamily.semibold }, // eyebrow caps
-  buttonMd:    { size: 14, lh: 1.40, ls: 0,     family: fontFamily.semibold },
+  heroDisplay: { size: 66, lh: 1.10, ls: -2,    family: fontFamily.semibold },
+  displayLg:   { size: 50, lh: 1.10, ls: -1.5,  family: fontFamily.semibold },
+  headingLg:   { size: 38, lh: 1.20, ls: -1,    family: fontFamily.semibold },
+  headingMd:   { size: 30, lh: 1.25, ls: -0.5,  family: fontFamily.semibold },
+  headingSm:   { size: 24, lh: 1.30, ls: -0.3,  family: fontFamily.semibold },
+  cardTitle:   { size: 19, lh: 1.40, ls: -0.2,  family: fontFamily.semibold },
+  subtitle:    { size: 17, lh: 1.50, ls: 0,     family: fontFamily.medium },
+  bodyMd:      { size: 16, lh: 1.50, ls: 0,     family: fontFamily.regular },
+  bodyMdBold:  { size: 16, lh: 1.50, ls: 0,     family: fontFamily.bold },
+  bodySm:      { size: 14, lh: 1.50, ls: 0,     family: fontFamily.regular },
+  bodySmMed:   { size: 14, lh: 1.50, ls: 0,     family: fontFamily.medium },
+  caption:     { size: 15, lh: 1.50, ls: 0,     family: fontFamily.regular },
+  captionBold: { size: 15, lh: 1.40, ls: 0.3,   family: fontFamily.semibold },
+  micro:       { size: 14, lh: 1.50, ls: 0.4,   family: fontFamily.regular },
+  microBold:   { size: 14, lh: 1.40, ls: 1.5,   family: fontFamily.semibold }, // eyebrow caps
+  buttonMd:    { size: 15, lh: 1.40, ls: 0,     family: fontFamily.semibold },
 };
 
 // ─────────────────────────────── Category Colors ─────────────────────────
