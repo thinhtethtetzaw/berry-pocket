@@ -85,7 +85,11 @@ export function StatisticsScreen() {
     return t;
   }, [filtered]);
 
+  // All outflows (used for donut breakdown and "total spending" headline that
+  // shows the full breakdown including transfers to Total/Fund).
   const totalSpent = totals.savings + totals.necessary + totals.living + totals.rosca + totals.fixed;
+  // True expense — savings + necessary are transfers, not expenses.
+  const trueExpense = totals.living + totals.rosca + totals.fixed;
 
   // Last-7-days daily spend bars (expenses only — income excluded).
   const { dailyBars, dailyAvg } = useMemo(() => {
@@ -273,7 +277,7 @@ export function StatisticsScreen() {
         <View style={{ height: space.md }} />
 
         {/* Income / Expense summary for the filter range */}
-        <IncomeExpenseSummary income={totals.income} expense={totalSpent} />
+        <IncomeExpenseSummary income={totals.income} expense={trueExpense} />
 
         <View style={{ height: space.md }} />
 

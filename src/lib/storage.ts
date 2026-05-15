@@ -23,6 +23,10 @@ const KEY = {
   // v1.2 — user-defined categories layered on top of built-ins
   customMains:     'bb:customMains',
   customSubs:      'bb:customSubs',
+  // v1.2 — list of cycle keys whose payout has been received
+  roscaReceipts:   'bb:roscaReceipts',
+  // v1.2 — flag for one-time injection of the "For my parents" fixed entry
+  parentsMigrated: 'bb:parentsMigrated',
 };
 
 const PREFIX = {
@@ -41,6 +45,7 @@ const CH = {
   language:     'ch:language',
   customMains:  'ch:customMains',
   customSubs:   'ch:customSubs',
+  roscaReceipts:'ch:roscaReceipts',
 };
 
 // Fired whenever any month transaction list is written, so the
@@ -198,6 +203,53 @@ export function ensureTotalsMigrated(): Promise<void> {
   return migrationPromise;
 }
 
+// ─────────── v1.2 · "For my parents" fixed-expense back-fill ───────────
+//
+// "For my parents" (฿2,000) was added to DEFAULT_FIXED later, but existing
+// saved months (before this default existed) don't have it. This one-time
+// migration iterates every saved `bb:fixed:*` key and appends the entry
+// when missing.
+
+let parentsMigrationPromise: Promise<void> | null = null;
+export function ensureParentsMigrated(): Promise<void> {
+  if (parentsMigrationPromise) return parentsMigrationPromise;
+  parentsMigrationPromise = (async () => {
+    try {
+      const done = await get<boolean>(KEY.parentsMigrated, false);
+      if (done) return;
+
+      const keys = await AsyncStorage.getAllKeys();
+      const fixedKeys = keys.filter(k => k.startsWith('bb:fixed:'));
+      let updatedAny = false;
+      for (const k of fixedKeys) {
+        const items = await get<FixedItem[]>(k, []);
+        const hasParents = items.some(
+          (i) => i.id === 'family' || i.label.toLowerCase().includes('parent'),
+        );
+        if (!hasParents) {
+          // Insert before ROSCA if present, else append.
+          const roscaIdx = items.findIndex((i) => i.id === 'rosca');
+          const next = [...items];
+          const parentsEntry: FixedItem = {
+            id: 'family',
+            label: 'For my parents',
+            icon: 'Heart',
+            amount: 2000,
+          };
+          if (roscaIdx >= 0) next.splice(roscaIdx, 0, parentsEntry);
+          else next.push(parentsEntry);
+          await set(k, next);
+          updatedAny = true;
+        }
+      }
+
+      await set(KEY.parentsMigrated, true);
+      if (updatedAny) emit(PREFIX.fixed);
+    } catch {}
+  })();
+  return parentsMigrationPromise;
+}
+
 // ─────────────────────────────── Hooks ──────────────────────────────────
 
 export function useMonthData(year: number, month: number) {
@@ -293,7 +345,9 @@ export function useFixed(year: number, month: number) {
       getForMonth<FixedItem[]>(PREFIX.fixed, year, month, DEFAULT_FIXED)
         .then(v => { if (alive) setFixed(v); });
     };
-    refetch();
+    // Run the one-time "For my parents" back-fill before the first read,
+    // so previously-saved months pick up the new default entry.
+    ensureParentsMigrated().then(refetch);
     const unsub = subscribe(PREFIX.fixed, refetch);
     return () => { alive = false; unsub(); };
   }, [year, month]);
@@ -679,6 +733,75 @@ export function useAllMainCategories(): MainCategory[] {
 export function useAllSubCategories(): SubCategory[] {
   const { customSubs } = useCustomSubs();
   return useMemo(() => [...SUB_CATEGORIES, ...customSubs], [customSubs]);
+}
+
+// ─────────── v1.2 · ROSCA payout receipts ───────────
+//
+// Identifies a unique cycle by (startYear, startMonth, myPosition). Once
+// the user taps "Mark payout as received" that cycle's key is added to
+// the receipts list and the payout amount is bumped into Total Amount.
+// Re-configuring the circle (different start or position) gives a new
+// cycle key, so the button comes back for the next round.
+
+export function cycleKeyFor(cfg: RoscaConfig): string {
+  return `${cfg.startYear}-${String(cfg.startMonth + 1).padStart(2, '0')}-pos${cfg.myPosition}`;
+}
+
+export function useRoscaReceipts() {
+  const [list, setList] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const refetch = () => {
+      get<string[]>(KEY.roscaReceipts, []).then(v => { if (alive) setList(v); });
+    };
+    refetch();
+    const unsub = subscribe(CH.roscaReceipts, refetch);
+    return () => { alive = false; unsub(); };
+  }, []);
+
+  /**
+   * Mark a cycle's payout as received. Also bumps the running Total Amount
+   * by the payout (`monthlyPayment * groupSize`) and emits all relevant
+   * channels so other screens refresh.
+   */
+  const markReceived = async (cfg: RoscaConfig) => {
+    const key = cycleKeyFor(cfg);
+    if (list.includes(key)) return; // already received
+
+    const payout = cfg.monthlyPayment * cfg.groupSize;
+    const next = [...list, key];
+    setList(next);
+    await set(KEY.roscaReceipts, next);
+    emit(CH.roscaReceipts);
+
+    // Bump Total Amount in-place.
+    const t = await get<number>(KEY.total, 0);
+    await set(KEY.total, t + payout);
+    emit(CH.total);
+  };
+
+  /** Undo a receipt — refunds the payout back out of Total Amount. */
+  const undoReceived = async (cfg: RoscaConfig) => {
+    const key = cycleKeyFor(cfg);
+    if (!list.includes(key)) return;
+
+    const payout = cfg.monthlyPayment * cfg.groupSize;
+    const next = list.filter(k => k !== key);
+    setList(next);
+    await set(KEY.roscaReceipts, next);
+    emit(CH.roscaReceipts);
+
+    const t = await get<number>(KEY.total, 0);
+    await set(KEY.total, t - payout);
+    emit(CH.total);
+  };
+
+  return { receipts: list, markReceived, undoReceived };
+}
+
+export function isCycleReceived(receipts: string[], cfg: RoscaConfig): boolean {
+  return receipts.includes(cycleKeyFor(cfg));
 }
 
 // ─────────── v1.2 · Import / Export (JSON backup) ───────────

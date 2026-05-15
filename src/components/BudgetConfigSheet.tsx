@@ -13,26 +13,34 @@ interface Props {
   visible: boolean;
   budget: Budget;
   fixedTotal: number;
+  /** Sum of recorded income transactions for the displayed month. Read-only. */
+  actualIncome: number;
+  /** Optional sum of ROSCA monthly contribution so it counts toward allocation. */
+  roscaTotal?: number;
   onClose: () => void;
   onSave: (b: Budget) => void;
 }
 
-export function BudgetConfigSheet({ visible, budget, fixedTotal, onClose, onSave }: Props) {
+export function BudgetConfigSheet({
+  visible, budget, fixedTotal, actualIncome, roscaTotal = 0, onClose, onSave,
+}: Props) {
   const { theme } = useTheme();
   const [draft, setDraft] = useState<Budget>(budget);
 
   useEffect(() => { if (visible) setDraft(budget); }, [visible, budget]);
 
-  const allocated = draft.savings + draft.necessary + draft.living + fixedTotal;
-  const remaining = draft.income - allocated;
+  // Income is no longer editable here — it's a live sum of recorded income.
+  // Unallocated = actualIncome - (savings + necessary + living + fixed + rosca)
+  const allocated = draft.savings + draft.necessary + draft.living + fixedTotal + roscaTotal;
+  const remaining = actualIncome - allocated;
   const isOver = remaining < 0;
 
-  function update<K extends keyof Budget>(k: K, v: number) {
+  function update<K extends 'savings' | 'necessary' | 'living'>(k: K, v: number) {
     setDraft(prev => ({ ...prev, [k]: v }));
   }
 
   function autoBalance() {
-    const living = Math.max(0, draft.income - draft.savings - draft.necessary - fixedTotal);
+    const living = Math.max(0, actualIncome - draft.savings - draft.necessary - fixedTotal - roscaTotal);
     setDraft({ ...draft, living });
   }
 
@@ -66,20 +74,41 @@ export function BudgetConfigSheet({ visible, budget, fixedTotal, onClose, onSave
                 )}
               </View>
 
-              <Field label="Income" value={draft.income} onChange={v => update('income', v)} theme={theme} />
+              {/* Income — read-only, dynamic from recorded income transactions */}
+              <View style={S.field}>
+                <Txt variant="microBold" color={theme.steel} style={S.fieldLabel}>INCOME</Txt>
+                <View style={[S.inputRow, { borderColor: theme.border, backgroundColor: theme.bgSubtle }]}>
+                  <Txt variant="bodyMdBold" color={theme.muted}>฿</Txt>
+                  <Txt variant="bodyMdBold" color={theme.ink} style={{ flex: 1 }}>
+                    {actualIncome.toLocaleString('en-US')}
+                  </Txt>
+                </View>
+                <Txt variant="micro" color={theme.muted} style={{ marginTop: 4 }}>
+                  Auto · sum of recorded income transactions
+                </Txt>
+              </View>
+
               <Field label="Savings" value={draft.savings} onChange={v => update('savings', v)} theme={theme} />
               <Field label="Necessary" value={draft.necessary} onChange={v => update('necessary', v)} theme={theme} />
               <Field label="Living" value={draft.living} onChange={v => update('living', v)} theme={theme} />
 
               <Txt variant="micro" color={theme.muted} style={S.fixedNote}>
-                Fixed expenses ({fmt(fixedTotal)}) are managed separately
+                Fixed ({fmt(fixedTotal)}) and ROSCA ({fmt(roscaTotal)}) are managed separately
               </Txt>
 
               <View style={S.actions}>
                 <Pressable onPress={onClose} style={[S.btn, S.btnCancel, { borderColor: theme.border }]}>
                   <Txt variant="buttonMd" color={theme.steel}>Cancel</Txt>
                 </Pressable>
-                <Pressable onPress={() => { onSave(draft); onClose(); }} style={[S.btn, S.btnPrimary, { backgroundColor: theme.ink }]}>
+                <Pressable
+                  onPress={() => {
+                    // Keep budget.income field in sync with actual recorded
+                    // income so legacy consumers still see the right number.
+                    onSave({ ...draft, income: actualIncome });
+                    onClose();
+                  }}
+                  style={[S.btn, S.btnPrimary, { backgroundColor: theme.ink }]}
+                >
                   <Txt variant="buttonMd" color="#FFFFFF">Save</Txt>
                 </Pressable>
               </View>

@@ -1,12 +1,13 @@
-import { View, StyleSheet, Pressable } from 'react-native';
+import { Alert, View, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings2 } from 'lucide-react-native';
+import { Settings2, CheckCircle2, ArrowDownCircle } from 'lucide-react-native';
 import { useTheme } from '../ThemeContext';
-import { radius, space, CATEGORY_GRADIENT, v7Text, v7Surface } from '../theme';
+import { radius, space, CATEGORY_GRADIENT, v7Text, v7Surface, palette } from '../theme';
 import { fmt } from '../lib/format';
 import { Txt } from './Txt';
 import type { RoscaConfig } from '../lib/budget';
 import { deriveRoscaSchedule } from '../lib/budget';
+import { useRoscaReceipts, isCycleReceived } from '../lib/storage';
 
 interface Props {
   cfg: RoscaConfig;
@@ -20,8 +21,39 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
   const daysUntilPayout = Math.ceil(
     (schedule.payoutDate.getTime() - now.getTime()) / 86400000,
   );
-  const payoutLabel = daysUntilPayout > 0 ? `${daysUntilPayout} days away` : 'Received';
+  const { receipts, markReceived, undoReceived } = useRoscaReceipts();
+  const received = isCycleReceived(receipts, cfg);
+  // Eligible to receive once we're on/past the payout date.
+  const canReceive = daysUntilPayout <= 0;
+
+  const payoutLabel = received
+    ? 'Received ✓'
+    : daysUntilPayout > 0
+      ? `${daysUntilPayout} days away`
+      : 'Ready to receive';
   const [c1, c2] = CATEGORY_GRADIENT.rosca;
+
+  function confirmReceive() {
+    Alert.alert(
+      `Receive ${fmt(schedule.payoutAmount)}?`,
+      'This will add the payout to your Total Amount and mark this round as received.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Receive', onPress: () => markReceived(cfg) },
+      ],
+    );
+  }
+
+  function confirmUndo() {
+    Alert.alert(
+      'Undo receive?',
+      `${fmt(schedule.payoutAmount)} will be removed from Total Amount.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Undo', style: 'destructive', onPress: () => undoReceived(cfg) },
+      ],
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -31,11 +63,9 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {/* 22% white frosted wash */}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: v7Surface.blurWash }]} />
 
       <View style={styles.content}>
-        {/* Eyebrow + config */}
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
             <Txt variant="microBold" color={v7Text.secondary} style={styles.eyebrow}>
@@ -44,7 +74,7 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
             <Txt variant="heroDisplay" color={v7Text.primary} style={styles.amount}>
               {fmt(schedule.payoutAmount)}
             </Txt>
-            <Txt variant="caption" color={v7Text.secondary}>
+            <Txt variant="caption" color={received ? palette.successText : v7Text.secondary}>
               {schedule.payoutDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
               {'  ·  '}{payoutLabel}
             </Txt>
@@ -59,6 +89,32 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
             </Pressable>
           )}
         </View>
+
+        {/* Receive button — visible whenever we're on/past the payout date */}
+        {canReceive && !received && (
+          <Pressable
+            onPress={confirmReceive}
+            style={({ pressed }) => [
+              styles.receiveBtn,
+              { backgroundColor: v7Text.primary, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <ArrowDownCircle size={16} color="#FFFFFF" strokeWidth={2.4} />
+            <Txt variant="buttonMd" color="#FFFFFF">Receive payout</Txt>
+          </Pressable>
+        )}
+        {received && (
+          <Pressable
+            onPress={confirmUndo}
+            style={({ pressed }) => [
+              styles.receivedBtn,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <CheckCircle2 size={14} color={palette.successText} strokeWidth={2.4} />
+            <Txt variant="bodySmMed" color={palette.successText}>Payout received · undo</Txt>
+          </Pressable>
+        )}
 
         <View style={[styles.divider, { backgroundColor: v7Surface.hairline }]} />
 
@@ -110,6 +166,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  receiveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 44,
+    borderRadius: 12,
+    marginTop: space.md,
+  },
+  receivedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: space.md,
+    paddingVertical: 8,
   },
   divider: { height: 1, marginVertical: space.md },
   meta: {

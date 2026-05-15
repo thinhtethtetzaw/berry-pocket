@@ -2,7 +2,6 @@ import { View, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronRight,
-  Globe,
   Sun,
   Users,
   Home,
@@ -18,14 +17,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTheme } from '../ThemeContext';
 import { space, v7Text, v7Surface, v7Accent } from '../theme';
 import {
   useRosca, useBudget, useFixed,
-  useCurrency, useThemePref, useLanguage,
-  ThemePref, LangPref,
+  useCurrency, useThemePref,
+  ThemePref,
   exportAllData, parseImportBundle, importAllData,
+  useMonthData,
 } from '../lib/storage';
 import { DEFAULT_ROSCA, DEFAULT_BUDGET, DEFAULT_FIXED } from '../lib/budget';
 import { fmt } from '../lib/format';
@@ -42,11 +42,13 @@ import { SubCategoryEditorSheet } from '../components/SubCategoryEditorSheet';
 import { useCustomMains, useCustomSubs, CustomMain } from '../lib/storage';
 import type { SubCategory } from '../lib/budget';
 
+// Pure symbol options — no exchange-rate conversion happens.
+// Switching just replaces the symbol shown before each amount.
 const CURRENCY_OPTIONS = [
-  { id: '฿', label: 'Thai Baht (฿)', sub: 'THB · symbol before' },
-  { id: '$', label: 'US Dollar ($)', sub: 'USD · symbol before' },
-  { id: '€', label: 'Euro (€)',      sub: 'EUR · symbol before' },
-  { id: '¥', label: 'Japanese Yen (¥)', sub: 'JPY · symbol before' },
+  { id: '฿', label: '฿ Baht symbol' },
+  { id: '$', label: '$ Dollar symbol' },
+  { id: '€', label: '€ Euro symbol' },
+  { id: '¥', label: '¥ Yen symbol' },
 ];
 
 const THEME_OPTIONS: { id: ThemePref; label: string; sub?: string; disabled?: boolean }[] = [
@@ -55,12 +57,6 @@ const THEME_OPTIONS: { id: ThemePref; label: string; sub?: string; disabled?: bo
   { id: 'system', label: 'System', sub: 'Match device', disabled: true },
 ];
 
-const LANGUAGE_OPTIONS: { id: LangPref; label: string; sub?: string; disabled?: boolean }[] = [
-  { id: 'en', label: 'English' },
-  { id: 'th', label: 'ไทย',     sub: 'Coming soon', disabled: true },
-  { id: 'zh', label: '中文',    sub: 'Coming soon', disabled: true },
-  { id: 'es', label: 'Español', sub: 'Coming soon', disabled: true },
-];
 
 export function SettingsScreen() {
   const { theme } = useTheme();
@@ -71,16 +67,20 @@ export function SettingsScreen() {
   const { cfg, update: updateRosca } = useRosca(year, month);
   const { budget, update: updateBudget } = useBudget(year, month);
   const { fixed, update: updateFixed } = useFixed(year, month);
+  // Need this month's transactions to compute actualIncome for the budget sheet.
+  const { transactions } = useMonthData(year, month);
+  const actualIncome = useMemo(
+    () => transactions.filter(t => t.main === 'income').reduce((s, t) => s + t.amount, 0),
+    [transactions],
+  );
   const { currency, setCurrency } = useCurrency();
   const { themePref, setThemePref } = useThemePref();
-  const { language, setLanguage } = useLanguage();
 
   const [roscaOpen, setRoscaOpen]       = useState(false);
   const [budgetOpen, setBudgetOpen]     = useState(false);
   const [fixedOpen, setFixedOpen]       = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [themeOpen, setThemeOpen]       = useState(false);
-  const [langOpen, setLangOpen]         = useState(false);
   const [catsOpen, setCatsOpen]         = useState(false);
 
   // Category editor state (hoisted up so editors are siblings of the manager,
@@ -175,7 +175,6 @@ export function SettingsScreen() {
             updateRosca(DEFAULT_ROSCA);
             setCurrency('฿');
             setThemePref('light');
-            setLanguage('en');
           },
         },
       ],
@@ -184,7 +183,6 @@ export function SettingsScreen() {
 
   // Display labels
   const themeLabel = themePref.charAt(0).toUpperCase() + themePref.slice(1);
-  const langLabel = LANGUAGE_OPTIONS.find(o => o.id === language)?.label ?? language;
   const currencyLabel = CURRENCY_OPTIONS.find(o => o.id === currency)?.label ?? currency;
 
   return (
@@ -213,14 +211,6 @@ export function SettingsScreen() {
             sub={themeLabel}
             onPress={() => setThemeOpen(true)}
             right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
-          />
-          <Hairline />
-          <Row
-            icon={<Globe size={15} color={v7Text.primary} strokeWidth={2} />}
-            title="Language"
-            sub={langLabel}
-            onPress={() => setLangOpen(true)}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
             last
           />
         </View>
@@ -230,8 +220,8 @@ export function SettingsScreen() {
         <View style={styles.group}>
           <Row
             icon={<Txt variant="bodyMdBold" color={v7Text.primary}>{currency}</Txt>}
-            title="Currency"
-            sub={currencyLabel}
+            title="Currency symbol"
+            sub={`Currently ${currency} · symbol only · no rate conversion`}
             onPress={() => setCurrencyOpen(true)}
             right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
           />
@@ -330,6 +320,8 @@ export function SettingsScreen() {
         visible={budgetOpen}
         budget={budget}
         fixedTotal={totalFixed}
+        actualIncome={actualIncome}
+        roscaTotal={cfg.monthlyPayment}
         onClose={() => setBudgetOpen(false)}
         onSave={updateBudget}
       />
@@ -343,8 +335,8 @@ export function SettingsScreen() {
       {/* Preference pickers */}
       <OptionPickerSheet
         visible={currencyOpen}
-        title="Currency"
-        hint="Affects every amount shown in the app."
+        title="Currency symbol"
+        hint="Changes the symbol shown before every amount. Values are NOT converted — ฿1,000 becomes $1,000 (just the label changes)."
         options={CURRENCY_OPTIONS}
         selected={currency}
         onClose={() => setCurrencyOpen(false)}
@@ -359,28 +351,30 @@ export function SettingsScreen() {
         onClose={() => setThemeOpen(false)}
         onSelect={(id) => setThemePref(id)}
       />
-      <OptionPickerSheet<LangPref>
-        visible={langOpen}
-        title="Language"
-        hint="More languages are coming soon."
-        options={LANGUAGE_OPTIONS}
-        selected={language}
-        onClose={() => setLangOpen(false)}
-        onSelect={(id) => setLanguage(id)}
-      />
       <CategoriesViewerSheet
         visible={catsOpen}
         onClose={() => setCatsOpen(false)}
-        onEditMain={(editing) => setMainEditor({ open: true, editing })}
-        onEditSub={(editing, parent, color) =>
-          setSubEditor({ open: true, editing, parent, color })
-        }
+        /* iOS can't reliably show two RN Modals stacked — so when the user
+           taps Add/Edit, we DISMISS the manager first, open the editor
+           after a short delay for the slide-down animation, then reopen
+           the manager when the editor closes. Same for sub-categories. */
+        onEditMain={(editing) => {
+          setCatsOpen(false);
+          setTimeout(() => setMainEditor({ open: true, editing }), 320);
+        }}
+        onEditSub={(editing, parent, color) => {
+          setCatsOpen(false);
+          setTimeout(() => setSubEditor({ open: true, editing, parent, color }), 320);
+        }}
       />
 
       <CategoryEditorSheet
         visible={mainEditor.open}
         editing={mainEditor.editing}
-        onClose={() => setMainEditor({ open: false, editing: null })}
+        onClose={() => {
+          setMainEditor({ open: false, editing: null });
+          setTimeout(() => setCatsOpen(true), 320);
+        }}
         onSave={(cat) => upsertMain(cat)}
         onDelete={mainEditor.editing ? (id) => removeMain(id) : undefined}
       />
@@ -390,7 +384,10 @@ export function SettingsScreen() {
         parentMain={subEditor.parent}
         parentColor={subEditor.color}
         editing={subEditor.editing}
-        onClose={() => setSubEditor({ open: false, editing: null, parent: '' })}
+        onClose={() => {
+          setSubEditor({ open: false, editing: null, parent: '' });
+          setTimeout(() => setCatsOpen(true), 320);
+        }}
         onSave={(sub) => upsertSub(sub)}
         onDelete={subEditor.editing ? (id) => removeSub(id) : undefined}
       />

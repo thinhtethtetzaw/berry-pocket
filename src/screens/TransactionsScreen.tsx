@@ -58,12 +58,15 @@ export function TransactionsScreen() {
       : transactions.filter((t) => t.main === filter);
 
   const totals = useMemo(() => {
-    let income = 0,
-      expense = 0;
+    // Savings + Necessary are TRANSFERS to long-term accounts (Total Amount /
+    // Necessary Fund), not real expenses — they shouldn't be lumped into the
+    // "Expense" total. The summary cards only count actual outflows.
+    let income = 0, expense = 0;
     for (const tx of filtered) {
-      const main = MAIN_CATEGORIES.find((m) => m.id === tx.main);
-      if (main?.type === "in") income += tx.amount;
-      else expense += tx.amount;
+      if (tx.main === 'income')   { income += tx.amount; continue; }
+      if (tx.main === 'savings')   continue; // → Total Amount, not expense
+      if (tx.main === 'necessary') continue; // → Necessary Fund, not expense
+      expense += tx.amount; // living / fixed / rosca
     }
     return { income, expense };
   }, [filtered]);

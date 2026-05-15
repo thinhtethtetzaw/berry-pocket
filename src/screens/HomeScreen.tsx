@@ -116,7 +116,9 @@ export function HomeScreen() {
         />
 
         <HeroBalance
-          income={budget.income + totals.income}
+          // Income is what you actually recorded this month — no double-count
+          // against the configured budget.income (which is now only a target).
+          income={totals.income}
           spent={totalSpent}
           totalSaved={total}
           endOfMonth={endOfMonthDelta}
@@ -263,6 +265,8 @@ export function HomeScreen() {
         visible={budgetCfgOpen}
         budget={budget}
         fixedTotal={totalFixed}
+        actualIncome={totals.income}
+        roscaTotal={roscaCfg.monthlyPayment}
         onClose={() => setBudgetCfgOpen(false)}
         onSave={updateBudget}
       />
