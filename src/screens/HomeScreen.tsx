@@ -1,50 +1,69 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Pencil } from 'lucide-react-native';
-import { useTheme } from '../ThemeContext';
-import { palette, radius, space } from '../theme';
-import { useBudget, useFixed, useMonthData, useRosca, useLastSeenMonth, useTotal } from '../lib/storage';
-import { MonthRolloverModal } from '../components/MonthRolloverModal';
-import { Shimmer } from '../components/Shimmer';
-import { AppHeader } from '../components/AppHeader';
-import { HeroBalance } from '../components/HeroBalance';
-import { AllocationTile } from '../components/AllocationTile';
-import { SpendingDonut } from '../components/SpendingDonut';
-import { SectionLabel } from '../components/SectionLabel';
-import { TransactionRow } from '../components/TransactionRow';
-import { TransactionSheet } from '../components/TransactionSheet';
-import { RoscaConfigSheet } from '../components/RoscaConfigSheet';
-import { BudgetConfigSheet } from '../components/BudgetConfigSheet';
-import { FixedItemsSheet } from '../components/FixedItemsSheet';
-import { Card } from '../components/Card';
-import { Icon } from '../components/Icon';
-import { Txt } from '../components/Txt';
-import { PageBackground } from '../components/PageBackground';
-import { fmt, MONTHS_SHORT } from '../lib/format';
-import type { Transaction } from '../lib/budget';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Plus, Pencil } from "lucide-react-native";
+import { useTheme } from "../ThemeContext";
+import { palette, radius, space } from "../theme";
+import {
+  useBudget,
+  useFixed,
+  useMonthData,
+  useRosca,
+  useLastSeenMonth,
+  useTotal,
+  useCurrency,
+} from "../lib/storage";
+import { MonthRolloverModal } from "../components/MonthRolloverModal";
+import { Shimmer } from "../components/Shimmer";
+import { AppHeader } from "../components/AppHeader";
+import { HeroBalance } from "../components/HeroBalance";
+import { AllocationTile } from "../components/AllocationTile";
+import { SpendingDonut } from "../components/SpendingDonut";
+import { SectionLabel } from "../components/SectionLabel";
+import { TransactionRow } from "../components/TransactionRow";
+import { TransactionSheet } from "../components/TransactionSheet";
+import { RoscaConfigSheet } from "../components/RoscaConfigSheet";
+import { BudgetConfigSheet } from "../components/BudgetConfigSheet";
+import { FixedItemsSheet } from "../components/FixedItemsSheet";
+import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
+import { Txt } from "../components/Txt";
+import { PageBackground } from "../components/PageBackground";
+import { fmt, MONTHS_SHORT } from "../lib/format";
+import type { Transaction } from "../lib/budget";
 
 function formatRecentDateHeader(iso: string): string {
-  const d = new Date(iso + 'T00:00:00');
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-  const stripped = new Date(d); stripped.setHours(0, 0, 0, 0);
-  if (stripped.getTime() === today.getTime()) return 'TODAY';
-  if (stripped.getTime() === yesterday.getTime()) return 'YESTERDAY';
+  const d = new Date(iso + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const stripped = new Date(d);
+  stripped.setHours(0, 0, 0, 0);
+  if (stripped.getTime() === today.getTime()) return "TODAY";
+  if (stripped.getTime() === yesterday.getTime()) return "YESTERDAY";
   return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()].toUpperCase()}`;
 }
 
 export function HomeScreen() {
   const { theme } = useTheme();
+  const navigation = useNavigation<any>();
+  useCurrency(); // re-render when currency symbol changes
+
+  function openActivityFiltered(cat: import("../lib/budget").MainCategoryId) {
+    navigation.navigate("Activity", { initialFilter: cat });
+  }
   // Home is always pinned to the current real-world month. Time-travel
   // lives on the Statistics tab.
   const today = new Date();
-  const year  = today.getFullYear();
+  const year = today.getFullYear();
   const month = today.getMonth();
 
   const [txSheetOpen, setTxSheetOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [txSheetDefault, setTxSheetDefault] = useState<import('../lib/budget').MainCategoryId>('living');
+  const [txSheetDefault, setTxSheetDefault] =
+    useState<import("../lib/budget").MainCategoryId>("living");
   const [roscaCfgOpen, setRoscaCfgOpen] = useState(false);
   const [budgetCfgOpen, setBudgetCfgOpen] = useState(false);
   const [fixedSheetOpen, setFixedSheetOpen] = useState(false);
@@ -52,7 +71,7 @@ export function HomeScreen() {
   // ── Month rollover modal ──
   const { lastSeen, mark, loaded: lastSeenLoaded } = useLastSeenMonth();
   const [rolloverOpen, setRolloverOpen] = useState(false);
-  const currentYYYYMM = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const currentYYYYMM = `${year}-${String(month + 1).padStart(2, "0")}`;
 
   useEffect(() => {
     if (!lastSeenLoaded) return;
@@ -74,33 +93,62 @@ export function HomeScreen() {
     return { year: py, month: pm };
   }, [year, month]);
 
-  const { transactions, add, update, remove, loading } = useMonthData(year, month);
+  const { transactions, add, update, remove, loading } = useMonthData(
+    year,
+    month,
+  );
   const { cfg: roscaCfg, update: updateRosca } = useRosca(year, month);
   const { budget, update: updateBudget } = useBudget(year, month);
   const { fixed, update: updateFixed } = useFixed(year, month);
   const { total } = useTotal();
 
   const totals = useMemo(() => {
-    const t = { income: 0, savings: 0, necessary: 0, fixed: 0, rosca: 0, living: 0 };
+    const t = {
+      income: 0,
+      savings: 0,
+      necessary: 0,
+      fixed: 0,
+      rosca: 0,
+      living: 0,
+    };
     for (const tx of transactions) t[tx.main] += tx.amount;
     return t;
   }, [transactions]);
 
   const totalFixed = fixed.reduce((s, f) => s + f.amount, 0);
-  const totalSpent = totals.necessary + totals.living + totals.rosca + totals.fixed + totals.savings;
+  const totalSpent =
+    totals.necessary +
+    totals.living +
+    totals.rosca +
+    totals.fixed +
+    totals.savings;
   // What will be added to "Total Saved" at end of this month — current
   // month's savings + necessary contributions. Already live in `totals`.
   const endOfMonthDelta = totals.savings + totals.necessary;
-  const recent = [...transactions].sort((a, b) =>
-    b.date.localeCompare(a.date) || b.id - a.id
-  ).slice(0, 5);
+  const recent = [...transactions]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+    .slice(0, 5);
 
-  function openExpense() { setTxSheetDefault('living'); setEditingTx(null); setTxSheetOpen(true); }
-  function openIncome()  { setTxSheetDefault('income'); setEditingTx(null); setTxSheetOpen(true); }
-  function openEdit(tx: Transaction) { setEditingTx(tx); setTxSheetOpen(true); }
+  function openExpense() {
+    setTxSheetDefault("living");
+    setEditingTx(null);
+    setTxSheetOpen(true);
+  }
+  function openIncome() {
+    setTxSheetDefault("income");
+    setEditingTx(null);
+    setTxSheetOpen(true);
+  }
+  function openEdit(tx: Transaction) {
+    setEditingTx(tx);
+    setTxSheetOpen(true);
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: theme.bg }}
+      edges={["top"]}
+    >
       <PageBackground />
       <ScrollView
         style={{ flex: 1 }}
@@ -130,7 +178,7 @@ export function HomeScreen() {
         <View style={{ height: space.xl }} />
         <SectionLabel
           title="Allocation"
-          action={{ label: 'Edit', onPress: () => setBudgetCfgOpen(true) }}
+          action={{ label: "Edit", onPress: () => setBudgetCfgOpen(true) }}
         />
         <View style={styles.grid}>
           {/* v13 checker pattern — Savings (0) + ROSCA (3) are solid, Necessary (1) + Living (2) are plain. */}
@@ -155,6 +203,7 @@ export function HomeScreen() {
             icon="ShoppingBag"
             budget={budget.living}
             spent={totals.living}
+            onPress={() => openActivityFiltered("living")}
           />
           <AllocationTile
             main="rosca"
@@ -170,34 +219,61 @@ export function HomeScreen() {
         <View style={{ height: space.xl }} />
         <SectionLabel
           title="Fixed expenses"
-          action={{ label: 'Manage', onPress: () => setFixedSheetOpen(true) }}
+          action={{ label: "Manage", onPress: () => setFixedSheetOpen(true) }}
         />
         <Card variant="glass" padding={space.lg}>
           <View style={styles.fixedHeaderRow}>
             <View>
-              <Txt variant="cardTitle" color={theme.ink}>Recurring</Txt>
-              <Txt variant="caption" color={theme.steel}>Auto every month</Txt>
+              <Txt variant="cardTitle" color={theme.ink}>
+                Recurring
+              </Txt>
             </View>
-            <Txt variant="headingSm" color={theme.ink}>{fmt(totalFixed)}</Txt>
+            <Txt variant="headingSm" color={theme.ink}>
+              {fmt(totalFixed)}
+            </Txt>
           </View>
-          <View style={[styles.divider, { backgroundColor: theme.borderSoft }]} />
+          <View
+            style={[styles.divider, { backgroundColor: theme.borderSoft }]}
+          />
           {fixed.length === 0 ? (
-            <Pressable onPress={() => setFixedSheetOpen(true)} style={styles.addInline}>
+            <Pressable
+              onPress={() => setFixedSheetOpen(true)}
+              style={styles.addInline}
+            >
               <Plus size={14} color={theme.steel} strokeWidth={2} />
-              <Txt variant="bodySmMed" color={theme.steel}>Add fixed expense</Txt>
+              <Txt variant="bodySmMed" color={theme.steel}>
+                Add fixed expense
+              </Txt>
             </Pressable>
           ) : (
             fixed.map((item, i) => (
               <View key={item.id}>
                 <Pressable
                   onPress={() => setFixedSheetOpen(true)}
-                  style={({ pressed }) => [styles.fixedItem, { opacity: pressed ? 0.6 : 1 }]}
+                  style={({ pressed }) => [
+                    styles.fixedItem,
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}
                 >
-                  <View style={[styles.fixedIcon, { backgroundColor: theme.bgSubtle }]}>
-                    <Icon name={item.icon} size={13} color={theme.charcoal} strokeWidth={2} />
+                  <View
+                    style={[
+                      styles.fixedIcon,
+                      { backgroundColor: theme.bgSubtle },
+                    ]}
+                  >
+                    <Icon
+                      name={item.icon}
+                      size={13}
+                      color={theme.charcoal}
+                      strokeWidth={2}
+                    />
                   </View>
-                  <Txt variant="bodyMd" color={theme.ink} style={{ flex: 1 }}>{item.label}</Txt>
-                  <Txt variant="bodyMdBold" color={theme.ink}>{fmt(item.amount, { compact: true })}</Txt>
+                  <Txt variant="bodyMd" color={theme.ink} style={{ flex: 1 }}>
+                    {item.label}
+                  </Txt>
+                  <Txt variant="bodyMdBold" color={theme.ink}>
+                    {fmt(item.amount, { compact: true })}
+                  </Txt>
                 </Pressable>
               </View>
             ))
@@ -206,18 +282,53 @@ export function HomeScreen() {
 
         <View style={{ height: space.xl }} />
         <SectionLabel title="Spending overview" />
-        <SpendingDonut income={totals.income} totals={{ savings: totals.savings, necessary: totals.necessary, living: totals.living, rosca: totals.rosca, fixed: totals.fixed }} />
+        <SpendingDonut
+          income={totals.income}
+          totals={{
+            savings: totals.savings,
+            necessary: totals.necessary,
+            living: totals.living,
+            rosca: totals.rosca,
+            fixed: totals.fixed,
+          }}
+        />
 
         <View style={{ height: space.xl }} />
         <SectionLabel title="Recent activity" />
         {recent.length === 0 ? (
           <Card variant="glass" padding={space.xxl}>
-            <View style={{ alignItems: 'center' }}>
-              <View style={[styles.emptyIcon, { backgroundColor: theme.bgElevated, borderColor: theme.border, borderWidth: 1 }]}>
-                <Icon name="Inbox" size={20} color={theme.steel} strokeWidth={1.8} />
+            <View style={{ alignItems: "center" }}>
+              <View
+                style={[
+                  styles.emptyIcon,
+                  {
+                    backgroundColor: theme.bgElevated,
+                    borderColor: theme.border,
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <Icon
+                  name="Inbox"
+                  size={20}
+                  color={theme.steel}
+                  strokeWidth={1.8}
+                />
               </View>
-              <Txt variant="bodyMdBold" color={theme.ink} style={{ marginTop: space.sm }}>No activity this month</Txt>
-              <Txt variant="bodySm" color={theme.steel} style={{ marginTop: 4 }}>Tap + to add a transaction</Txt>
+              <Txt
+                variant="bodyMdBold"
+                color={theme.ink}
+                style={{ marginTop: space.sm }}
+              >
+                No activity this month
+              </Txt>
+              <Txt
+                variant="bodySm"
+                color={theme.steel}
+                style={{ marginTop: 4 }}
+              >
+                Tap + to add a transaction
+              </Txt>
             </View>
           </Card>
         ) : (
@@ -231,12 +342,21 @@ export function HomeScreen() {
             .sort((a, b) => b[0].localeCompare(a[0]))
             .map(([date, txs]) => (
               <View key={date} style={{ marginBottom: space.md }}>
-                <Txt variant="microBold" color={theme.steel} style={styles.dateHeader}>
+                <Txt
+                  variant="microBold"
+                  color={theme.steel}
+                  style={styles.dateHeader}
+                >
                   {formatRecentDateHeader(date)}
                 </Txt>
                 <View style={{ gap: 8 }}>
-                  {txs.map(tx => (
-                    <TransactionRow key={tx.id} tx={tx} onPress={openEdit} hideDate />
+                  {txs.map((tx) => (
+                    <TransactionRow
+                      key={tx.id}
+                      tx={tx}
+                      onPress={openEdit}
+                      hideDate
+                    />
                   ))}
                 </View>
               </View>
@@ -292,41 +412,45 @@ export function HomeScreen() {
 
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: space.lg, paddingTop: space.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   fixedHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   divider: { height: 1, marginVertical: space.sm },
   fixedItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     gap: space.sm,
   },
   fixedIcon: {
-    width: 28, height: 28,
+    width: 28,
+    height: 28,
     borderRadius: radius.full,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   itemDivider: { height: 1, marginLeft: 28 + space.sm },
   addInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     paddingVertical: space.lg,
   },
   dateHeader: {
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 1.5,
     marginBottom: 8,
     marginLeft: 4,
   },
   emptyIcon: {
-    width: 48, height: 48,
+    width: 48,
+    height: 48,
     borderRadius: radius.full,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

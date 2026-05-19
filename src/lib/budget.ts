@@ -73,6 +73,7 @@ export const SUB_CATEGORIES: SubCategory[] = [
   { id: 'ai',            label: 'AI Subs',        icon: 'Sparkles',    main: 'fixed' },
   { id: 'utilities',     label: 'Utilities',      icon: 'Plug',        main: 'fixed' },
   { id: 'brother',       label: 'Brother',        icon: 'Heart',       main: 'fixed' },
+  { id: 'parents',       label: 'For my parents', icon: 'Heart',       main: 'fixed' },
 
   // ROSCA
   { id: 'rosca-pay',     label: 'ROSCA Payment',  icon: 'Users',       main: 'rosca' },

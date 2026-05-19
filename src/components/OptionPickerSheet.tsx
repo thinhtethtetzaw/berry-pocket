@@ -1,8 +1,9 @@
-import { Modal, View, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { Check, X } from 'lucide-react-native';
-import { useTheme } from '../ThemeContext';
-import { radius, space, v7Text, v7Surface } from '../theme';
-import { Txt } from './Txt';
+import { Fragment } from "react";
+import { Modal, View, Pressable, StyleSheet, ScrollView } from "react-native";
+import { Check, X } from "lucide-react-native";
+import { useTheme } from "../ThemeContext";
+import { radius, space, v7Text, v7Surface } from "../theme";
+import { Txt } from "./Txt";
 
 export interface PickerOption<T extends string = string> {
   id: T;
@@ -26,25 +27,49 @@ interface Props<T extends string = string> {
  * Slides up from the bottom; tapping an option calls onSelect + closes.
  */
 export function OptionPickerSheet<T extends string = string>({
-  visible, title, hint, options, selected, onClose, onSelect,
+  visible,
+  title,
+  hint,
+  options,
+  selected,
+  onClose,
+  onSelect,
 }: Props<T>) {
   const { theme } = useTheme();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <Pressable style={S.backdrop} onPress={onClose}>
-        <Pressable onPress={() => {}} style={[S.sheet, { borderColor: theme.border }]}>
+        <Pressable
+          onPress={() => {}}
+          style={[S.sheet, { borderColor: theme.border }]}
+        >
           <View style={S.handle} />
 
           <View style={S.header}>
-            <Txt variant="headingSm" color={v7Text.primary}>{title}</Txt>
-            <Pressable onPress={onClose} hitSlop={10} style={[S.iconBtn, { backgroundColor: '#F5F6FA' }]}>
+            <Txt variant="headingSm" color={v7Text.primary}>
+              {title}
+            </Txt>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={[S.iconBtn, { backgroundColor: "#F5F6FA" }]}
+            >
               <X size={14} color={v7Text.primary} strokeWidth={2} />
             </Pressable>
           </View>
 
           {hint ? (
-            <Txt variant="caption" color={v7Text.tertiary} style={{ marginBottom: space.md }}>
+            <Txt
+              variant="caption"
+              color={v7Text.tertiary}
+              style={{ marginBottom: space.md }}
+            >
               {hint}
             </Txt>
           ) : null}
@@ -55,30 +80,43 @@ export function OptionPickerSheet<T extends string = string>({
                 const isLast = i === options.length - 1;
                 const isActive = opt.id === selected;
                 return (
-                  <Pressable
-                    key={opt.id}
-                    disabled={opt.disabled}
-                    onPress={() => {
-                      if (opt.disabled) return;
-                      onSelect(opt.id);
-                      onClose();
-                    }}
-                    style={({ pressed }) => [
-                      S.row,
-                      { opacity: opt.disabled ? 0.35 : pressed ? 0.6 : 1 },
-                      !isLast && S.rowDivider,
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Txt variant="bodySmMed" color={v7Text.primary}>{opt.label}</Txt>
-                      {opt.sub ? (
-                        <Txt variant="micro" color={v7Text.tertiary} style={{ marginTop: 2 }}>
-                          {opt.sub}
+                  <Fragment key={opt.id}>
+                    <Pressable
+                      disabled={opt.disabled}
+                      onPress={() => {
+                        if (opt.disabled) return;
+                        onSelect(opt.id);
+                        onClose();
+                      }}
+                      style={({ pressed }) => [
+                        S.row,
+                        { opacity: opt.disabled ? 0.35 : pressed ? 0.6 : 1 },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Txt variant="bodySmMed" color={v7Text.primary}>
+                          {opt.label}
                         </Txt>
-                      ) : null}
-                    </View>
-                    {isActive && <Check size={18} color={v7Text.primary} strokeWidth={2.4} />}
-                  </Pressable>
+                        {opt.sub ? (
+                          <Txt
+                            variant="micro"
+                            color={v7Text.tertiary}
+                            style={{ marginTop: 2 }}
+                          >
+                            {opt.sub}
+                          </Txt>
+                        ) : null}
+                      </View>
+                      {isActive && (
+                        <Check
+                          size={18}
+                          color={v7Text.primary}
+                          strokeWidth={2.4}
+                        />
+                      )}
+                    </Pressable>
+                    {!isLast && <View style={S.divider} />}
+                  </Fragment>
                 );
               })}
             </View>
@@ -90,30 +128,40 @@ export function OptionPickerSheet<T extends string = string>({
 }
 
 const S = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+  },
   sheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: radius.xxxl,
     borderTopRightRadius: radius.xxxl,
     paddingHorizontal: space.lg,
     paddingBottom: space.xl,
     paddingTop: 6,
-    maxHeight: '70%',
+    maxHeight: "70%",
   },
   handle: {
-    width: 40, height: 4, borderRadius: 2, alignSelf: 'center',
-    backgroundColor: '#D8DCE5', marginVertical: 10,
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    backgroundColor: "#D8DCE5",
+    marginVertical: 10,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: space.sm,
   },
   iconBtn: {
-    width: 30, height: 30,
+    width: 30,
+    height: 30,
     borderRadius: radius.full,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   list: {
     backgroundColor: v7Surface.plainCard,
@@ -122,15 +170,15 @@ const S = StyleSheet.create({
     paddingVertical: 4,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     paddingVertical: 14,
     paddingHorizontal: 12,
   },
-  rowDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: v7Surface.hairline,
+  divider: {
+    height: 1,
+    backgroundColor: v7Surface.hairline,
     marginHorizontal: 8,
   },
 });

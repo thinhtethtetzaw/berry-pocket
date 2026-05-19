@@ -1,7 +1,7 @@
-import { View, StyleSheet } from 'react-native';
-import { v7Text, v7Surface, v7Accent } from '../theme';
-import { Txt } from './Txt';
-import { getFmtCurrency } from '../lib/format';
+import { View, StyleSheet } from "react-native";
+import { v7Text, v7Surface, v7Accent } from "../theme";
+import { Txt } from "./Txt";
+import { getFmtCurrency } from "../lib/format";
 
 interface Props {
   income: number;
@@ -18,25 +18,51 @@ export function IncomeExpenseSummary({ income, expense }: Props) {
   const currency = getFmtCurrency();
   return (
     <View style={styles.row}>
-      <SumCard label="INCOME" sign="+" color={v7Accent.success} value={income} currency={currency} />
-      <SumCard label="EXPENSE" sign="−" color={v7Accent.danger}  value={expense} currency={currency} />
+      <SumCard
+        label="INCOME"
+        sign="+"
+        color={v7Accent.success}
+        value={income}
+        currency={currency}
+      />
+      <SumCard
+        label="EXPENSE"
+        sign="−"
+        color={v7Accent.danger}
+        value={expense}
+        currency={currency}
+      />
     </View>
   );
 }
 
 function SumCard({
-  label, sign, color, value, currency,
-}: { label: string; sign: string; color: string; value: number; currency: string }) {
+  label,
+  sign,
+  color,
+  value,
+  currency,
+}: {
+  label: string;
+  sign: string;
+  color: string;
+  value: number;
+  currency: string;
+}) {
   return (
     <View style={styles.card}>
       <Txt variant="microBold" color={v7Text.secondary} style={styles.eyebrow}>
         {label}
       </Txt>
       <View style={styles.amountRow}>
-        <Txt variant="headingSm" color={color} style={styles.sign}>{sign}</Txt>
-        <Txt variant="headingSm" color={color} style={styles.symbol}>{currency}</Txt>
+        <Txt variant="headingSm" color={color} style={styles.sign}>
+          {sign}
+        </Txt>
+        <Txt variant="headingSm" color={color} style={styles.symbol}>
+          {currency}
+        </Txt>
         <Txt variant="headingSm" color={color} style={styles.number}>
-          {Math.round(value).toLocaleString('en-US')}
+          {Math.round(value).toLocaleString("en-US")}
         </Txt>
       </View>
     </View>
@@ -45,7 +71,7 @@ function SumCard({
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   card: {
@@ -56,21 +82,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   eyebrow: {
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 1.4,
-    fontSize: 10,
+    fontSize: 12,
   },
   amountRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "baseline",
+    marginTop: 10,
   },
   sign: {
     letterSpacing: -0.5,
   },
   symbol: {
     opacity: 0.65,
-    fontWeight: '500' as const,
+    fontWeight: "500" as const,
     letterSpacing: -0.5,
   },
   number: {

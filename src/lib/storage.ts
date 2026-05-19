@@ -822,6 +822,63 @@ export interface ExportBundle {
  * Gather every namespaced key into a single bundle and return as a JSON
  * string ready for saving / sharing.
  */
+/**
+ * Reset configuration only — wipes settings/preferences (budget targets,
+ * fixed items, ROSCA cfg, currency, theme, custom categories) but KEEPS
+ * activity data: transactions, total, necessary fund, withdrawals,
+ * ROSCA receipts. Use this when the user wants a fresh start to the
+ * setup but keeps their history.
+ */
+export async function resetConfigOnly(): Promise<void> {
+  const allKeys = await AsyncStorage.getAllKeys();
+  // Keys to wipe — configuration only
+  const configPrefixes = ['bb:budget:', 'bb:fixed:', 'bb:rosca:'];
+  const configExact = new Set<string>([
+    KEY.currency,
+    KEY.themePref,
+    KEY.language,
+    KEY.customMains,
+    KEY.customSubs,
+    KEY.parentsMigrated, // re-run the parents migration after reset
+  ]);
+  const toRemove = allKeys.filter(
+    (k) =>
+      configExact.has(k) ||
+      configPrefixes.some((p) => k.startsWith(p)),
+  );
+  if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
+
+  // Reset fmt() symbol immediately
+  setFmtCurrency('฿');
+
+  // Notify every relevant channel so screens refetch
+  emit(CH.currency);
+  emit(CH.themePref);
+  emit(CH.language);
+  emit(CH.customMains);
+  emit(CH.customSubs);
+  emit(PREFIX.budget);
+  emit(PREFIX.fixed);
+  emit(PREFIX.rosca);
+}
+
+/**
+ * Clear ALL data — including transactions, totals, and receipts.
+ * Resets the app to its very first-launch state.
+ */
+export async function clearAllData(): Promise<void> {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const bbKeys = allKeys.filter((k) => k.startsWith('bb:'));
+  if (bbKeys.length > 0) await AsyncStorage.multiRemove(bbKeys);
+
+  setFmtCurrency('฿');
+
+  // Fan out every channel so every hook refetches from a clean slate.
+  for (const ch of Object.values(CH)) emit(ch);
+  for (const ch of Object.values(PREFIX)) emit(ch);
+  emit(CH_ALL_MONTHS);
+}
+
 export async function exportAllData(): Promise<string> {
   const keys = await AsyncStorage.getAllKeys();
   const bbKeys = keys.filter(k => k.startsWith('bb:'));

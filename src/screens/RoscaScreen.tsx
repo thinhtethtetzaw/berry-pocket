@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Settings2 } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
 import { space } from "../theme";
-import { useRosca } from "../lib/storage";
+import { useRosca, useCurrency } from "../lib/storage";
 import { deriveRoscaSchedule } from "../lib/budget";
 import { fmt, MONTHS_SHORT } from "../lib/format";
 import { AppHeader } from "../components/AppHeader";
@@ -18,6 +18,7 @@ import { palette, radius } from "../theme";
 
 export function RoscaScreen() {
   const { theme } = useTheme();
+  useCurrency(); // re-render when currency symbol changes
   const today = new Date();
   const { cfg, update } = useRosca(today.getFullYear(), today.getMonth());
   const [configOpen, setConfigOpen] = useState(false);
@@ -91,7 +92,7 @@ export function RoscaScreen() {
                     </Txt>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Txt variant="bodySmMed" color={theme.ink}>
+                    <Txt variant="bodyMd" color={theme.ink}>
                       {MONTHS_SHORT[m.month]} {m.year}
                       {isPayout && (
                         <Txt variant="caption" color={palette.successText}>
@@ -116,7 +117,7 @@ export function RoscaScreen() {
                       </>
                     ) : (
                       <>
-                        <Txt variant="bodySmMed" color={theme.ink}>
+                        <Txt variant="bodyMd" color={theme.ink}>
                           −{fmt(cfg.monthlyPayment, { compact: true })}
                         </Txt>
                         <Txt
@@ -208,7 +209,7 @@ function StatCard({
         <Txt variant="cardTitle" color={theme.ink}>
           {value}
         </Txt>
-        <Txt variant="micro" color={theme.muted}>
+        <Txt variant="micro" color={theme.charcoal}>
           {unit}
         </Txt>
       </View>
@@ -226,9 +227,9 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   numCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",

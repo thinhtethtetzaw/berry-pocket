@@ -99,18 +99,6 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
             >
               {fmt(schedule.payoutAmount)}
             </Txt>
-            <Txt
-              variant="caption"
-              color={received ? palette.successText : v7Text.secondary}
-            >
-              {schedule.payoutDate.toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-              {"  ·  "}
-              {payoutLabel}
-            </Txt>
           </View>
           {onConfigure && (
             <Pressable
@@ -125,51 +113,6 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
             </Pressable>
           )}
         </View>
-
-        {/* Receive button — visible whenever we're on/past the payout date */}
-        {canReceive && !received && (
-          <Pressable
-            onPress={confirmReceive}
-            style={({ pressed }) => [
-              styles.receiveBtn,
-              { backgroundColor: v7Text.primary, opacity: pressed ? 0.85 : 1 },
-            ]}
-          >
-            <ArrowDownCircle size={16} color="#FFFFFF" strokeWidth={2.4} />
-            <Txt variant="buttonMd" color="#FFFFFF">
-              Receive payout
-            </Txt>
-          </Pressable>
-        )}
-        {received && (
-          <View style={styles.receivedRow}>
-            <View style={styles.receivedBadge}>
-              <CheckCircle2
-                size={16}
-                color={palette.successText}
-                strokeWidth={2.4}
-              />
-              <Txt variant="bodySmMed" color={palette.white}>
-                Payout received
-              </Txt>
-            </View>
-            <Pressable
-              onPress={confirmUndo}
-              style={({ pressed }) => [
-                styles.undoBtn,
-                { opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <Txt variant="bodySmMed" color={v7Text.primary}>
-                Undo
-              </Txt>
-            </Pressable>
-          </View>
-        )}
-
-        <View
-          style={[styles.divider, { backgroundColor: v7Surface.hairline }]}
-        />
 
         <View style={styles.meta}>
           <View style={styles.metaItem}>
@@ -197,6 +140,49 @@ export function RoscaCard({ cfg, now, onConfigure }: Props) {
             </Txt>
           </View>
         </View>
+
+        <Txt
+          variant="caption"
+          color={received ? palette.successText : v7Text.secondary}
+          style={{ marginTop: 4 }}
+        >
+          {schedule.payoutDate.toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
+          {"  ·  "}
+          {payoutLabel}
+        </Txt>
+
+        {/* Receive button — visible whenever we're on/past the payout date */}
+        {canReceive && !received && (
+          <Pressable
+            onPress={confirmReceive}
+            style={({ pressed }) => [
+              styles.receiveBtn,
+              { backgroundColor: v7Text.primary, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <ArrowDownCircle size={16} color="#FFFFFF" strokeWidth={2.4} />
+            <Txt variant="buttonMd" color="#FFFFFF">
+              Receive payout
+            </Txt>
+          </Pressable>
+        )}
+        {received && (
+          <Pressable
+            onPress={confirmUndo}
+            style={({ pressed }) => [
+              styles.undoBtnFull,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Txt variant="bodySmMed" color={v7Text.secondary}>
+              Undo receive
+            </Txt>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -245,10 +231,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: space.md,
   },
+  undoBtnSolo: {
+    alignSelf: "flex-end",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.55)",
+    borderWidth: 1,
+    borderColor: v7Surface.hairline,
+    marginTop: space.md,
+  },
   receivedRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
     marginTop: space.md,
   },
   receivedBadge: {
@@ -267,9 +263,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: v7Surface.hairline,
+    borderColor: v7Text.primary,
   },
-  divider: { height: 1, marginVertical: space.md },
+  undoBtnFull: {
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    marginTop: space.md,
+    borderWidth: 1,
+    borderColor: v7Text.primary,
+  },
+  divider: { height: 1, marginVertical: space.md, marginHorizontal: -space.lg },
   meta: {
     flexDirection: "row",
     gap: 22,

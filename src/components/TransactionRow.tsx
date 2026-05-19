@@ -1,12 +1,19 @@
-import { View, StyleSheet, Pressable } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
-import { useTheme } from '../ThemeContext';
-import { palette, radius, space, CATEGORY_BRAND, CATEGORY_PASTEL, v7Accent } from '../theme';
-import { fmt, formatDate } from '../lib/format';
-import type { Transaction } from '../lib/budget';
-import { MAIN_CATEGORIES, SUB_CATEGORIES } from '../lib/budget';
-import { Icon } from './Icon';
-import { Txt } from './Txt';
+import { View, StyleSheet, Pressable } from "react-native";
+import { ChevronRight } from "lucide-react-native";
+import { useTheme } from "../ThemeContext";
+import {
+  palette,
+  radius,
+  space,
+  CATEGORY_BRAND,
+  CATEGORY_PASTEL,
+  v7Accent,
+} from "../theme";
+import { fmt, formatDate } from "../lib/format";
+import type { Transaction } from "../lib/budget";
+import { MAIN_CATEGORIES, SUB_CATEGORIES } from "../lib/budget";
+import { Icon } from "./Icon";
+import { Txt } from "./Txt";
 
 interface Props {
   tx: Transaction;
@@ -18,16 +25,16 @@ interface Props {
 
 export function TransactionRow({ tx, onPress, inline, hideDate }: Props) {
   const { theme } = useTheme();
-  const main = MAIN_CATEGORIES.find(m => m.id === tx.main);
-  const sub = SUB_CATEGORIES.find(s => s.id === tx.cat);
+  const main = MAIN_CATEGORIES.find((m) => m.id === tx.main);
+  const sub = SUB_CATEGORIES.find((s) => s.id === tx.cat);
   const brand = CATEGORY_BRAND[tx.main];
   const pastel = CATEGORY_PASTEL[tx.main];
-  const isIncome = main?.type === 'in';
+  const isIncome = main?.type === "in";
 
   const wrapStyle = inline
     ? { paddingVertical: 10 }
     : {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: "#FFFFFF",
         borderColor: theme.border,
         borderWidth: 1,
         borderRadius: radius.xl,
@@ -38,22 +45,37 @@ export function TransactionRow({ tx, onPress, inline, hideDate }: Props) {
   return (
     <Pressable
       onPress={onPress ? () => onPress(tx) : undefined}
-      style={({ pressed }) => [styles.wrap, wrapStyle, { opacity: pressed ? 0.6 : 1 }]}
+      style={({ pressed }) => [
+        styles.wrap,
+        wrapStyle,
+        { opacity: pressed ? 0.6 : 1 },
+      ]}
     >
-      <View style={[styles.iconCircle, { backgroundColor: '#F5F6FA' }]}>
-        <Icon name={sub?.icon ?? main?.icon ?? 'Circle'} size={16} color={brand.bg} strokeWidth={2.2} />
+      <View style={[styles.iconCircle, { backgroundColor: "#F5F6FA" }]}>
+        <Icon
+          name={sub?.icon ?? main?.icon ?? "Circle"}
+          size={20}
+          color={brand.bg}
+          strokeWidth={2.2}
+        />
       </View>
 
       <View style={styles.info}>
-        <Txt variant="bodySmMed" color={theme.ink} numberOfLines={1}>
+        <Txt variant="bodyMd" color={theme.ink} numberOfLines={1}>
           {tx.desc || sub?.label || main?.label}
         </Txt>
         <View style={styles.metaRow}>
-          <Txt variant="micro" color={theme.steel}>{main?.label}</Txt>
+          <Txt variant="micro" color={theme.steel}>
+            {main?.label}
+          </Txt>
           {!hideDate && (
             <>
-              <View style={[styles.dotSep, { backgroundColor: theme.border }]} />
-              <Txt variant="micro" color={theme.steel}>{formatDate(tx.date)}</Txt>
+              <View
+                style={[styles.dotSep, { backgroundColor: theme.border }]}
+              />
+              <Txt variant="micro" color={theme.steel}>
+                {formatDate(tx.date)}
+              </Txt>
             </>
           )}
         </View>
@@ -63,11 +85,17 @@ export function TransactionRow({ tx, onPress, inline, hideDate }: Props) {
         variant="bodyMdBold"
         color={isIncome ? palette.successText : v7Accent.danger}
       >
-        {isIncome ? '+' : '−'}{fmt(tx.amount, { compact: true })}
+        {isIncome ? "+" : "−"}
+        {fmt(tx.amount, { compact: true })}
       </Txt>
 
       {onPress && (
-        <ChevronRight size={14} color={theme.muted} strokeWidth={2} style={{ marginLeft: 2 }} />
+        <ChevronRight
+          size={18}
+          color={theme.muted}
+          strokeWidth={2}
+          style={{ marginLeft: 2 }}
+        />
       )}
     </Pressable>
   );
@@ -75,24 +103,27 @@ export function TransactionRow({ tx, onPress, inline, hideDate }: Props) {
 
 const styles = StyleSheet.create({
   wrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: space.sm,
   },
   iconCircle: {
-    width: 38, height: 38,
+    width: 44,
+    height: 44,
     borderRadius: radius.full,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   info: { flex: 1 },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 3,
     gap: 6,
   },
   dotSep: {
-    width: 3, height: 3,
+    width: 3,
+    height: 3,
     borderRadius: 2,
   },
 });

@@ -1,9 +1,9 @@
-import { View, Pressable, StyleSheet } from 'react-native';
-import { useTheme } from '../ThemeContext';
-import { CATEGORY_SOLID, v7Text, v7TileInk, v7Accent } from '../theme';
-import { fmt } from '../lib/format';
-import { Txt } from './Txt';
-import type { MainCategoryId } from '../lib/budget';
+import { View, Pressable, StyleSheet } from "react-native";
+import { useTheme } from "../ThemeContext";
+import { CATEGORY_SOLID, v7Text, v7TileInk, v7Accent } from "../theme";
+import { fmt } from "../lib/format";
+import { Txt } from "./Txt";
+import type { MainCategoryId } from "../lib/budget";
 
 interface Props {
   main: MainCategoryId;
@@ -33,18 +33,27 @@ interface Props {
  *   - solid=true:  colored bento background, dark ink text
  *   - solid=false: plain light-gray background, hairline border
  */
-export function AllocationTile({ main, label, budget, spent = 0, onPress, solid }: Props) {
-  const { theme } = useTheme();
+export function AllocationTile({
+  main,
+  label,
+  budget,
+  spent = 0,
+  onPress,
+  solid,
+}: Props) {
   const isOver = spent > budget;
-  const pct = budget > 0 ? Math.min(999, Math.round((spent / budget) * 100)) : 0;
+  const pct =
+    budget > 0 ? Math.min(999, Math.round((spent / budget) * 100)) : 0;
   const color = CATEGORY_SOLID[main];
 
   // Text colors depend on which variant we're rendering.
   const labelColor = solid ? v7TileInk.secondary : v7Text.secondary;
-  const pctColor   = solid ? v7TileInk.secondary : v7Text.tertiary;
+  const pctColor = solid ? v7TileInk.secondary : v7Text.secondary;
   const amountColor = isOver
     ? v7Accent.danger
-    : solid ? v7TileInk.primary : v7Text.primary;
+    : solid
+      ? v7TileInk.primary
+      : v7Text.primary;
   const subColor = solid ? v7TileInk.secondary : v7Text.tertiary;
 
   return (
@@ -55,15 +64,26 @@ export function AllocationTile({ main, label, budget, spent = 0, onPress, solid 
         styles.wrap,
         solid
           ? { backgroundColor: color }
-          : { backgroundColor: '#F7F8FB', borderWidth: 1, borderColor: '#E6E8EF' },
+          : {
+              backgroundColor: "#F7F8FB",
+              borderWidth: 1,
+              borderColor: "#E6E8EF",
+            },
         { transform: [{ scale: pressed && onPress ? 0.97 : 1 }] },
       ]}
     >
       {/* Top row — label + percentage */}
       <View style={styles.topRow}>
-        <Txt variant="bodySmMed" color={labelColor} style={styles.label}>
+        <Txt
+          variant="microBold"
+          color={labelColor}
+          style={styles.label}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {label}
         </Txt>
+
         <Txt variant="caption" color={pctColor} style={styles.pct}>
           {pct}%
         </Txt>
@@ -75,7 +95,6 @@ export function AllocationTile({ main, label, budget, spent = 0, onPress, solid 
           {fmt(spent, { compact: true })}
         </Txt>
         <View style={styles.subRow}>
-          <View style={[styles.triangle, { borderTopColor: subColor }]} />
           <Txt variant="caption" color={subColor}>
             of {fmt(budget, { compact: true })}
           </Txt>
@@ -88,30 +107,36 @@ export function AllocationTile({ main, label, budget, spent = 0, onPress, solid 
 const styles = StyleSheet.create({
   wrap: {
     flex: 1,
-    minWidth: '47%',
+    minWidth: "47%",
     height: 128,
     borderRadius: 20,
     padding: 16,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
+    justifyContent: "space-between",
+    overflow: "hidden",
   },
   topRow: {
-    flexDirection: 'row',
-    width: '100%',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 6,
   },
-  label: { letterSpacing: 0.2 },
-  pct: { fontWeight: '700' as const, fontSize: 10 },
+  label: {
+    flex: 1,
+    minWidth: 0,
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
+  },
+  pct: { fontWeight: "700" as const, fontSize: 14, flexShrink: 0 },
   amount: {
     fontSize: 26,
-    fontWeight: '700' as const,
+    fontWeight: "700" as const,
     letterSpacing: -0.7,
     lineHeight: 28,
   },
   subRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     marginTop: 5,
   },
@@ -121,7 +146,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderRightWidth: 4,
     borderTopWidth: 5,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
   },
 });

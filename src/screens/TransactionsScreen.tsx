@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRoute, useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 import {
   View,
   ScrollView,
@@ -10,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Minus, Plus } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
 import { palette, radius, space } from "../theme";
-import { useMonthData } from "../lib/storage";
+import { useMonthData, useCurrency } from "../lib/storage";
 import { AppHeader } from "../components/AppHeader";
 import { TransactionRow } from "../components/TransactionRow";
 import { TransactionSheet } from "../components/TransactionSheet";
@@ -27,10 +29,25 @@ import { categoryAccent } from "../components/categoryAccent";
 
 export function TransactionsScreen() {
   const { theme } = useTheme();
+  useCurrency(); // re-render when currency symbol changes
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [filter, setFilter] = useState<MainCategoryId | "all">("all");
+
+  // Allow other screens to navigate here with a pre-set filter
+  // (e.g. Home → tap "Living" allocation tile → opens Activity filtered to Living).
+  const route = useRoute<any>();
+  useFocusEffect(
+    useCallback(() => {
+      const param = route.params?.initialFilter as MainCategoryId | undefined;
+      if (param) {
+        setFilter(param);
+        // Clear so navigating back to Activity manually doesn't keep re-applying it.
+        route.params = { ...(route.params ?? {}), initialFilter: undefined };
+      }
+    }, [route.params?.initialFilter]),
+  );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [sheetDefault, setSheetDefault] = useState<MainCategoryId>("living");
@@ -61,11 +78,15 @@ export function TransactionsScreen() {
     // Savings + Necessary are TRANSFERS to long-term accounts (Total Amount /
     // Necessary Fund), not real expenses — they shouldn't be lumped into the
     // "Expense" total. The summary cards only count actual outflows.
-    let income = 0, expense = 0;
+    let income = 0,
+      expense = 0;
     for (const tx of filtered) {
-      if (tx.main === 'income')   { income += tx.amount; continue; }
-      if (tx.main === 'savings')   continue; // → Total Amount, not expense
-      if (tx.main === 'necessary') continue; // → Necessary Fund, not expense
+      if (tx.main === "income") {
+        income += tx.amount;
+        continue;
+      }
+      if (tx.main === "savings") continue; // → Total Amount, not expense
+      if (tx.main === "necessary") continue; // → Necessary Fund, not expense
       expense += tx.amount; // living / fixed / rosca
     }
     return { income, expense };
@@ -117,14 +138,20 @@ export function TransactionsScreen() {
 
         {/* Summary */}
         <View style={{ marginBottom: space.lg }}>
-          <IncomeExpenseSummary income={totals.income} expense={totals.expense} />
+          <IncomeExpenseSummary
+            income={totals.income}
+            expense={totals.expense}
+          />
         </View>
 
         {/* Filter pills */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.filters, { paddingHorizontal: space.lg }]}
+          contentContainerStyle={[
+            styles.filters,
+            { paddingHorizontal: space.lg },
+          ]}
           style={{ marginHorizontal: -space.lg }}
         >
           <FilterPill
@@ -133,16 +160,29 @@ export function TransactionsScreen() {
             onPress={() => setFilter("all")}
             color={theme.ink}
           />
-          {MAIN_CATEGORIES.map((m) => (
-            <FilterPill
-              key={m.id}
-              label={m.label}
-              active={filter === m.id}
-              onPress={() => setFilter(m.id)}
-              color={categoryAccent(m.id, "light")}
-              icon={m.icon}
-            />
-          ))}
+          {/* Custom order — Living right after Income (matches the rest after) */}
+          {(() => {
+            const order: MainCategoryId[] = [
+              "income",
+              "living",
+              "savings",
+              "necessary",
+              "fixed",
+              "rosca",
+            ];
+            return [...MAIN_CATEGORIES]
+              .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+              .map((m) => (
+                <FilterPill
+                  key={m.id}
+                  label={m.label}
+                  active={filter === m.id}
+                  onPress={() => setFilter(m.id)}
+                  color={categoryAccent(m.id, "light")}
+                  icon={m.icon}
+                />
+              ));
+          })()}
         </ScrollView>
 
         {/* Transaction list */}
@@ -196,7 +236,12 @@ export function TransactionsScreen() {
               </Txt>
               <View style={{ gap: 8 }}>
                 {txs.map((tx) => (
-                  <TransactionRow key={tx.id} tx={tx} onPress={openEdit} />
+                  <TransactionRow
+                    key={tx.id}
+                    tx={tx}
+                    onPress={openEdit}
+                    hideDate
+                  />
                 ))}
               </View>
             </View>
@@ -220,7 +265,9 @@ export function TransactionsScreen() {
           ]}
         >
           <Minus size={16} color="#FFFFFF" strokeWidth={2.4} />
-          <Txt variant="buttonMd" color="#FFFFFF">New Expense</Txt>
+          <Txt variant="buttonMd" color="#FFFFFF">
+            Expense
+          </Txt>
         </Pressable>
         <Pressable
           onPress={openIncome}
@@ -235,7 +282,9 @@ export function TransactionsScreen() {
           ]}
         >
           <Plus size={16} color={theme.ink} strokeWidth={2.4} />
-          <Txt variant="buttonMd" color={theme.ink}>Income</Txt>
+          <Txt variant="buttonMd" color={theme.ink}>
+            Income
+          </Txt>
         </Pressable>
       </View>
 
@@ -286,7 +335,7 @@ function FilterPill({
           strokeWidth={2}
         />
       )}
-      <Txt variant="bodySmMed" color={active ? "#FFFFFF" : theme.ink}>
+      <Txt variant="bodyMd" color={active ? "#FFFFFF" : theme.ink}>
         {label}
       </Txt>
     </Pressable>

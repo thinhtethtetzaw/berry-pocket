@@ -1,5 +1,5 @@
-import { View, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, StyleSheet, Pressable, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   ChevronRight,
   Sun,
@@ -10,53 +10,65 @@ import {
   Filter,
   Upload,
   Download,
-} from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+  RotateCcw,
+} from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 // expo-file-system v19+ moved the legacy `cacheDirectory` API to a separate path.
 // The legacy API is what we want — simple writeAsStringAsync / readAsStringAsync.
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
-import { useState, useMemo } from 'react';
-import { useTheme } from '../ThemeContext';
-import { space, v7Text, v7Surface, v7Accent } from '../theme';
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import * as DocumentPicker from "expo-document-picker";
+import { useState, useMemo } from "react";
+import { useTheme } from "../ThemeContext";
+import { space, v7Text, v7Surface, v7Accent } from "../theme";
 import {
-  useRosca, useBudget, useFixed,
-  useCurrency, useThemePref,
+  useRosca,
+  useBudget,
+  useFixed,
+  useCurrency,
+  useThemePref,
   ThemePref,
-  exportAllData, parseImportBundle, importAllData,
+  exportAllData,
+  parseImportBundle,
+  importAllData,
+  resetConfigOnly,
+  clearAllData,
   useMonthData,
-} from '../lib/storage';
-import { DEFAULT_ROSCA, DEFAULT_BUDGET, DEFAULT_FIXED } from '../lib/budget';
-import { fmt } from '../lib/format';
-import { AppHeader } from '../components/AppHeader';
-import { RoscaConfigSheet } from '../components/RoscaConfigSheet';
-import { BudgetConfigSheet } from '../components/BudgetConfigSheet';
-import { FixedItemsSheet } from '../components/FixedItemsSheet';
-import { PageBackground } from '../components/PageBackground';
-import { Txt } from '../components/Txt';
-import { OptionPickerSheet } from '../components/OptionPickerSheet';
-import { CategoriesViewerSheet } from '../components/CategoriesViewerSheet';
-import { CategoryEditorSheet } from '../components/CategoryEditorSheet';
-import { SubCategoryEditorSheet } from '../components/SubCategoryEditorSheet';
-import { useCustomMains, useCustomSubs, CustomMain } from '../lib/storage';
-import type { SubCategory } from '../lib/budget';
+} from "../lib/storage";
+import { DEFAULT_ROSCA, DEFAULT_BUDGET, DEFAULT_FIXED } from "../lib/budget";
+import { fmt } from "../lib/format";
+import { AppHeader } from "../components/AppHeader";
+import { RoscaConfigSheet } from "../components/RoscaConfigSheet";
+import { BudgetConfigSheet } from "../components/BudgetConfigSheet";
+import { FixedItemsSheet } from "../components/FixedItemsSheet";
+import { PageBackground } from "../components/PageBackground";
+import { Txt } from "../components/Txt";
+import { OptionPickerSheet } from "../components/OptionPickerSheet";
+import { CategoriesViewerSheet } from "../components/CategoriesViewerSheet";
+import { CategoryEditorSheet } from "../components/CategoryEditorSheet";
+import { SubCategoryEditorSheet } from "../components/SubCategoryEditorSheet";
+import { useCustomMains, useCustomSubs, CustomMain } from "../lib/storage";
+import type { SubCategory } from "../lib/budget";
 
 // Pure symbol options — no exchange-rate conversion happens.
 // Switching just replaces the symbol shown before each amount.
 const CURRENCY_OPTIONS = [
-  { id: '฿', label: '฿ Baht symbol' },
-  { id: '$', label: '$ Dollar symbol' },
-  { id: '€', label: '€ Euro symbol' },
-  { id: '¥', label: '¥ Yen symbol' },
+  { id: "฿", label: "฿ Baht symbol" },
+  { id: "$", label: "$ Dollar symbol" },
+  { id: "€", label: "€ Euro symbol" },
+  { id: "¥", label: "¥ Yen symbol" },
 ];
 
-const THEME_OPTIONS: { id: ThemePref; label: string; sub?: string; disabled?: boolean }[] = [
-  { id: 'light',  label: 'Light',  sub: 'Always light' },
-  { id: 'dark',   label: 'Dark',   sub: 'Coming soon',  disabled: true },
-  { id: 'system', label: 'System', sub: 'Match device', disabled: true },
+const THEME_OPTIONS: {
+  id: ThemePref;
+  label: string;
+  sub?: string;
+  disabled?: boolean;
+}[] = [
+  { id: "light", label: "Light", sub: "Always light" },
+  { id: "dark", label: "Dark", sub: "Coming soon", disabled: true },
+  { id: "system", label: "System", sub: "Match device", disabled: true },
 ];
-
 
 export function SettingsScreen() {
   const { theme } = useTheme();
@@ -70,58 +82,71 @@ export function SettingsScreen() {
   // Need this month's transactions to compute actualIncome for the budget sheet.
   const { transactions } = useMonthData(year, month);
   const actualIncome = useMemo(
-    () => transactions.filter(t => t.main === 'income').reduce((s, t) => s + t.amount, 0),
+    () =>
+      transactions
+        .filter((t) => t.main === "income")
+        .reduce((s, t) => s + t.amount, 0),
     [transactions],
   );
   const { currency, setCurrency } = useCurrency();
   const { themePref, setThemePref } = useThemePref();
 
-  const [roscaOpen, setRoscaOpen]       = useState(false);
-  const [budgetOpen, setBudgetOpen]     = useState(false);
-  const [fixedOpen, setFixedOpen]       = useState(false);
+  const [roscaOpen, setRoscaOpen] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [fixedOpen, setFixedOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
-  const [themeOpen, setThemeOpen]       = useState(false);
-  const [catsOpen, setCatsOpen]         = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [catsOpen, setCatsOpen] = useState(false);
 
   // Category editor state (hoisted up so editors are siblings of the manager,
   // not nested — gorhom doesn't reliably handle nested BottomSheetModals)
   const { upsert: upsertMain, remove: removeMain } = useCustomMains();
   const { upsert: upsertSub, remove: removeSub } = useCustomSubs();
-  const [mainEditor, setMainEditor] = useState<{ open: boolean; editing: CustomMain | null }>({
-    open: false, editing: null,
+  const [mainEditor, setMainEditor] = useState<{
+    open: boolean;
+    editing: CustomMain | null;
+  }>({
+    open: false,
+    editing: null,
   });
   const [subEditor, setSubEditor] = useState<{
-    open: boolean; editing: SubCategory | null; parent: string; color?: string;
-  }>({ open: false, editing: null, parent: '' });
+    open: boolean;
+    editing: SubCategory | null;
+    parent: string;
+    color?: string;
+  }>({ open: false, editing: null, parent: "" });
 
   const totalFixed = fixed.reduce((s, f) => s + f.amount, 0);
 
   async function handleExport() {
     try {
       const json = await exportAllData();
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const filename = `berrypocket-${stamp}.json`;
       const uri = FileSystem.cacheDirectory + filename;
       await FileSystem.writeAsStringAsync(uri, json);
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(uri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export BerryPocket data',
-          UTI: 'public.json',
+          mimeType: "application/json",
+          dialogTitle: "Export BerryPocket data",
+          UTI: "public.json",
         });
       } else {
-        Alert.alert('Saved', `File saved to: ${uri}`);
+        Alert.alert("Saved", `File saved to: ${uri}`);
       }
     } catch (err) {
-      Alert.alert('Export failed', err instanceof Error ? err.message : 'Unknown error');
+      Alert.alert(
+        "Export failed",
+        err instanceof Error ? err.message : "Unknown error",
+      );
     }
   }
 
   async function handleImport() {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/json', 'text/plain', '*/*'],
+        type: ["application/json", "text/plain", "*/*"],
         copyToCacheDirectory: true,
       });
       if (result.canceled) return;
@@ -131,51 +156,69 @@ export function SettingsScreen() {
       const raw = await FileSystem.readAsStringAsync(file.uri);
       const bundle = parseImportBundle(raw);
 
-      const txCount = Object.keys(bundle.data).filter(k => k.startsWith('bb:month:')).length;
+      const txCount = Object.keys(bundle.data).filter((k) =>
+        k.startsWith("bb:month:"),
+      ).length;
       const exportedDate = new Date(bundle.exportedAt).toLocaleString();
 
       Alert.alert(
-        'Import this backup?',
+        "Import this backup?",
         `Exported: ${exportedDate}\nMonths of transactions: ${txCount}\n\nThis will OVERWRITE your current data. This cannot be undone.`,
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: "Cancel", style: "cancel" },
           {
-            text: 'Replace all',
-            style: 'destructive',
+            text: "Replace all",
+            style: "destructive",
             onPress: async () => {
               try {
                 await importAllData(bundle);
-                Alert.alert('Imported', 'Your data was restored from the backup.');
+                Alert.alert(
+                  "Imported",
+                  "Your data was restored from the backup.",
+                );
               } catch (err) {
-                Alert.alert('Import failed', err instanceof Error ? err.message : 'Unknown error');
+                Alert.alert(
+                  "Import failed",
+                  err instanceof Error ? err.message : "Unknown error",
+                );
               }
             },
           },
         ],
       );
     } catch (err) {
-      Alert.alert('Import failed', err instanceof Error ? err.message : 'Unknown error');
+      Alert.alert(
+        "Import failed",
+        err instanceof Error ? err.message : "Unknown error",
+      );
     }
   }
 
-  function clearAll() {
+  function handleResetConfig() {
     Alert.alert(
-      'Clear all data?',
-      'This will reset all transactions, budget settings, and ROSCA config. This cannot be undone.',
+      "Reset all configuration?",
+      "Budget targets, fixed expenses, ROSCA, currency, and theme go back to defaults.\n\nYour transactions and Total Amount are kept.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            const keys = await AsyncStorage.getAllKeys();
-            await AsyncStorage.multiRemove(keys.filter((k) => k.startsWith('bb:')));
-            updateBudget(DEFAULT_BUDGET);
-            updateFixed(DEFAULT_FIXED);
-            updateRosca(DEFAULT_ROSCA);
-            setCurrency('฿');
-            setThemePref('light');
-          },
+          text: "Reset",
+          style: "destructive",
+          onPress: () => resetConfigOnly(),
+        },
+      ],
+    );
+  }
+
+  function handleClearAll() {
+    Alert.alert(
+      "Clear ALL data?",
+      "This wipes every transaction, every saved budget and configuration, your Total Amount, Necessary Fund, withdrawals and ROSCA receipts — everything goes back to a fresh install.\n\nThis cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear everything",
+          style: "destructive",
+          onPress: () => clearAllData(),
         },
       ],
     );
@@ -183,10 +226,12 @@ export function SettingsScreen() {
 
   // Display labels
   const themeLabel = themePref.charAt(0).toUpperCase() + themePref.slice(1);
-  const currencyLabel = CURRENCY_OPTIONS.find(o => o.id === currency)?.label ?? currency;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: theme.bg }}
+      edges={["top"]}
+    >
       <PageBackground />
       <ScrollView
         style={{ flex: 1 }}
@@ -206,11 +251,13 @@ export function SettingsScreen() {
         <SectionTitle>Appearance</SectionTitle>
         <View style={styles.group}>
           <Row
-            icon={<Sun size={15} color={v7Text.primary} strokeWidth={2} />}
+            icon={<Sun size={17} color={v7Text.primary} strokeWidth={3} />}
             title="Theme"
             sub={themeLabel}
             onPress={() => setThemeOpen(true)}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
             last
           />
         </View>
@@ -219,35 +266,49 @@ export function SettingsScreen() {
         <SectionTitle>Money</SectionTitle>
         <View style={styles.group}>
           <Row
-            icon={<Txt variant="bodyMdBold" color={v7Text.primary}>{currency}</Txt>}
+            icon={
+              <Txt variant="bodyMdBold" color={v7Text.primary}>
+                {currency}
+              </Txt>
+            }
             title="Currency symbol"
-            sub={`Currently ${currency} · symbol only · no rate conversion`}
+            sub={`Change currency symbol`}
             onPress={() => setCurrencyOpen(true)}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
           />
           <Hairline />
           <Row
-            icon={<PiggyBank size={15} color={v7Text.primary} strokeWidth={2} />}
+            icon={
+              <PiggyBank size={17} color={v7Text.primary} strokeWidth={3} />
+            }
             title="Monthly allocation"
             sub="Set income and category budgets"
             onPress={() => setBudgetOpen(true)}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
           />
           <Hairline />
           <Row
-            icon={<Home size={15} color={v7Text.primary} strokeWidth={2} />}
+            icon={<Home size={15} color={v7Text.primary} strokeWidth={3} />}
             title="Fixed expenses"
-            sub={`${fixed.length} ${fixed.length === 1 ? 'item' : 'items'} · ${fmt(totalFixed)} / mo`}
+            sub={`${fixed.length} ${fixed.length === 1 ? "item" : "items"} · ${fmt(totalFixed)} / mo`}
             onPress={() => setFixedOpen(true)}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
           />
           <Hairline />
           <Row
-            icon={<Users size={15} color={v7Text.primary} strokeWidth={2} />}
+            icon={<Users size={15} color={v7Text.primary} strokeWidth={3} />}
             title="ROSCA"
             sub={`#${cfg.myPosition} of ${cfg.groupSize} · ${fmt(cfg.monthlyPayment, { compact: true })}/mo`}
             onPress={() => setRoscaOpen(true)}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
             last
           />
         </View>
@@ -256,11 +317,13 @@ export function SettingsScreen() {
         <SectionTitle>Categories</SectionTitle>
         <View style={styles.group}>
           <Row
-            icon={<Filter size={14} color={v7Text.primary} strokeWidth={2} />}
+            icon={<Filter size={14} color={v7Text.primary} strokeWidth={3} />}
             title="Manage categories"
             sub="View built-in categories"
             onPress={() => setCatsOpen(true)}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
             last
           />
         </View>
@@ -269,19 +332,23 @@ export function SettingsScreen() {
         <SectionTitle>Backup</SectionTitle>
         <View style={styles.group}>
           <Row
-            icon={<Upload size={14} color={v7Text.primary} strokeWidth={2} />}
+            icon={<Upload size={14} color={v7Text.primary} strokeWidth={3} />}
             title="Export data"
             sub="Save a JSON backup file"
             onPress={handleExport}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
           />
           <Hairline />
           <Row
-            icon={<Download size={14} color={v7Text.primary} strokeWidth={2} />}
+            icon={<Download size={14} color={v7Text.primary} strokeWidth={3} />}
             title="Import data"
             sub="Restore from a JSON backup"
             onPress={handleImport}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
             last
           />
         </View>
@@ -290,19 +357,37 @@ export function SettingsScreen() {
         <SectionTitle>Data</SectionTitle>
         <View style={styles.group}>
           <Row
-            icon={<Trash2 size={14} color={v7Accent.danger} strokeWidth={2} />}
+            icon={
+              <RotateCcw size={14} color={v7Text.primary} strokeWidth={3} />
+            }
+            title="Reset all configuration"
+            sub="Settings → defaults"
+            onPress={handleResetConfig}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
+          />
+          <Hairline />
+          <Row
+            icon={<Trash2 size={14} color={v7Accent.danger} strokeWidth={3} />}
             iconTint={v7Accent.dangerSoft}
             title="Clear all data"
-            sub="Reset everything to defaults"
+            sub="Wipe everything"
             danger
-            onPress={clearAll}
-            right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={2} />}
+            onPress={handleClearAll}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
             last
           />
         </View>
 
         <View style={styles.footer}>
-          <Txt variant="caption" color={v7Text.tertiary} style={{ textAlign: 'center' }}>
+          <Txt
+            variant="caption"
+            color={v7Text.tertiary}
+            style={{ textAlign: "center" }}
+          >
             BerryPocket · v1.1
           </Txt>
         </View>
@@ -364,7 +449,10 @@ export function SettingsScreen() {
         }}
         onEditSub={(editing, parent, color) => {
           setCatsOpen(false);
-          setTimeout(() => setSubEditor({ open: true, editing, parent, color }), 320);
+          setTimeout(
+            () => setSubEditor({ open: true, editing, parent, color }),
+            320,
+          );
         }}
       />
 
@@ -385,7 +473,7 @@ export function SettingsScreen() {
         parentColor={subEditor.color}
         editing={subEditor.editing}
         onClose={() => {
-          setSubEditor({ open: false, editing: null, parent: '' });
+          setSubEditor({ open: false, editing: null, parent: "" });
           setTimeout(() => setCatsOpen(true), 320);
         }}
         onSave={(sub) => upsertSub(sub)}
@@ -397,7 +485,11 @@ export function SettingsScreen() {
 
 function SectionTitle({ children }: { children: string }) {
   return (
-    <Txt variant="microBold" color={v7Text.tertiary} style={styles.sectionTitle}>
+    <Txt
+      variant="captionBold"
+      color={v7Text.tertiary}
+      style={styles.sectionTitle}
+    >
       {children.toUpperCase()}
     </Txt>
   );
@@ -424,18 +516,21 @@ function Row({
 }) {
   const inner = (
     <View style={styles.row}>
-      <View style={[styles.iconWrap, { backgroundColor: iconTint ?? '#F5F6FA' }]}>
+      <View
+        style={[styles.iconWrap, { backgroundColor: iconTint ?? "#F5F6FA" }]}
+      >
         {icon}
       </View>
       <View style={{ flex: 1 }}>
-        <Txt
-          variant="bodySmMed"
-          color={danger ? v7Accent.danger : v7Text.primary}
-        >
+        <Txt variant="bodyMd" color={danger ? v7Accent.danger : v7Text.primary}>
           {title}
         </Txt>
         {sub ? (
-          <Txt variant="micro" color={v7Text.tertiary} style={{ marginTop: 1 }}>
+          <Txt
+            variant="micro"
+            color={v7Text.tertiary}
+            style={{ marginTop: 1.5 }}
+          >
             {sub}
           </Txt>
         ) : null}
@@ -474,8 +569,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -484,8 +579,8 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   hairline: {
@@ -496,6 +591,6 @@ const styles = StyleSheet.create({
   footer: {
     paddingTop: 30,
     paddingBottom: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
 });
