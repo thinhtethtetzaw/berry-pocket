@@ -16,6 +16,7 @@ import {
   useMonthData,
   useCurrency,
   useAllMainCategories,
+  useAllSubCategories,
   type CustomMain,
 } from "../lib/storage";
 import { AppHeader } from "../components/AppHeader";
@@ -39,7 +40,26 @@ export function TransactionsScreen() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [filter, setFilter] = useState<MainCategoryId | "all">("all");
+  // Sub-category filter. "all" means no sub-filter applied. Always resets
+  // whenever the main filter changes — a sub only makes sense in the context
+  // of its parent main.
+  const [subFilter, setSubFilter] = useState<string>("all");
   const mainCategories = useAllMainCategories();
+  const subCategories = useAllSubCategories();
+
+  // Reset sub-filter whenever the main filter changes.
+  useEffect(() => {
+    setSubFilter("all");
+  }, [filter]);
+
+  // Subs that belong to the currently-selected main (if any).
+  const subsForFilter = useMemo(
+    () =>
+      filter === "all"
+        ? []
+        : subCategories.filter((s) => s.main === filter),
+    [filter, subCategories],
+  );
 
   // Allow other screens to navigate here with a pre-set filter
   // (e.g. Home → tap "Living" allocation tile → opens Activity filtered to Living).
@@ -75,10 +95,12 @@ export function TransactionsScreen() {
     setSheetOpen(true);
   }
 
-  const filtered =
-    filter === "all"
-      ? transactions
-      : transactions.filter((t) => t.main === filter);
+  const filtered = useMemo(() => {
+    let out = transactions;
+    if (filter !== "all") out = out.filter((t) => t.main === filter);
+    if (subFilter !== "all") out = out.filter((t) => t.cat === subFilter);
+    return out;
+  }, [transactions, filter, subFilter]);
 
   const totals = useMemo(() => {
     // Savings + Necessary are TRANSFERS to long-term accounts (Total Amount /
@@ -207,6 +229,39 @@ export function TransactionsScreen() {
           })()}
         </ScrollView>
 
+        {/* Sub-category filter — only shown when a specific main is active and
+            that main has at least one sub-category. */}
+        {filter !== "all" && subsForFilter.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.subFilters,
+              { paddingHorizontal: space.lg },
+            ]}
+            style={{ marginHorizontal: -space.lg }}
+          >
+            <FilterPill
+              label="All"
+              active={subFilter === "all"}
+              onPress={() => setSubFilter("all")}
+              color={theme.ink}
+              small
+            />
+            {subsForFilter.map((s) => (
+              <FilterPill
+                key={s.id}
+                label={s.label}
+                active={subFilter === s.id}
+                onPress={() => setSubFilter(s.id)}
+                color={theme.ink}
+                icon={s.icon}
+                small
+              />
+            ))}
+          </ScrollView>
+        )}
+
         {/* Transaction list */}
         {grouped.length === 0 ? (
           <Card padding={space.xxl}>
@@ -329,12 +384,16 @@ function FilterPill({
   onPress,
   color,
   icon,
+  small,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
   color: string;
   icon?: string;
+  /** Compact variant — used for sub-category pills so they read as a tier
+   *  below the main category row. */
+  small?: boolean;
 }) {
   const { theme } = useTheme();
   return (
@@ -342,6 +401,7 @@ function FilterPill({
       onPress={onPress}
       style={[
         styles.filterPill,
+        small && styles.filterPillSm,
         {
           // v7 — every active filter pill is solid black, same as "All"
           backgroundColor: active ? theme.ink : "#F4F5FA",
@@ -352,12 +412,15 @@ function FilterPill({
       {icon && (
         <Icon
           name={icon}
-          size={12}
+          size={small ? 11 : 12}
           color={active ? "#FFFFFF" : theme.steel}
           strokeWidth={2}
         />
       )}
-      <Txt variant="bodyMd" color={active ? "#FFFFFF" : theme.ink}>
+      <Txt
+        variant={small ? "caption" : "bodyMd"}
+        color={active ? "#FFFFFF" : theme.ink}
+      >
         {label}
       </Txt>
     </Pressable>
@@ -387,7 +450,12 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
   },
   sumLabel: { textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 2 },
-  filters: { flexDirection: "row", gap: 6, marginBottom: space.lg },
+  filters: { flexDirection: "row", gap: 6, marginBottom: space.sm },
+  subFilters: {
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: space.lg,
+  },
   filterPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -396,6 +464,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.full,
     borderWidth: 1,
+  },
+  filterPillSm: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
   },
   dateHeader: {
     textTransform: "uppercase",
