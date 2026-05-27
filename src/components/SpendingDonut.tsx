@@ -1,74 +1,73 @@
 import { useEffect, useRef, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 import { useTheme } from "../ThemeContext";
-import { radius, space, CHART_PALETTE, v7Text, v7Surface } from "../theme";
+import { radius, space, v7Text, v7Surface } from "../theme";
 import { fmt } from "../lib/format";
 import { Txt } from "./Txt";
 
-const SEGMENT_COLOR: Record<string, string> = CHART_PALETTE;
-
-const LABELS: Record<string, string> = {
-  living: "Living",
-  necessary: "Necessary",
-  savings: "Savings",
-  rosca: "Circles",
-  fixed: "Fixed",
-};
+export interface DonutSegment {
+  /** Stable id used for activeKey / onSegmentPress callbacks. */
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+}
 
 interface Props {
-  income: number;
-  totals: {
-    savings: number;
-    necessary: number;
-    living: number;
-    rosca: number;
-    fixed: number;
-  };
+  /** Pre-aggregated slices. Provide labels + colors so the chart stays
+   *  decoupled from the category source (built-in vs custom). */
+  segments: DonutSegment[];
+  /** Optional — when given, the default center readout shows
+   *  "LEFT / (income − totalSpent)". */
+  income?: number;
   size?: number;
   thickness?: number;
-  /** Center label override (e.g. "TOP" / "LEFT"). */
+  /** Center label override (e.g. "TOP" / "LIVING"). */
   centerLabel?: string;
-  /** Center value override (e.g. "Savings" or a fmt amount). */
+  /** Center value override (e.g. fmt amount, or category name). */
   centerValue?: string;
+  /** Optional tap handler — called with the segment key. Enables drill-down. */
+  onSegmentPress?: (key: string) => void;
+  /** Key of the currently focused segment (others dim). */
+  activeKey?: string;
 }
 
 /**
  * Donut chart — animated arc draw-on via SVG stroke-dasharray. Each
  * segment is a full circle clipped to its arc-length by a dasharray pair.
  * Progress animates 0 → 1 over 1.1s with cubic ease-out.
+ *
+ * Data-driven: caller supplies `segments` with explicit labels + colors,
+ * so custom categories from Settings flow through here automatically.
  */
 export function SpendingDonut({
+  segments: rawSegments,
   income,
-  totals,
   size = 140,
   thickness = 20,
   centerLabel,
   centerValue,
+  onSegmentPress,
+  activeKey,
 }: Props) {
   const cx = size / 2;
   const cy = size / 2;
   const r = (size - thickness) / 2;
   const C = 2 * Math.PI * r;
 
-  // Build segments, sorted by size for visual nicety
-  const segments = (Object.entries(totals) as [keyof typeof totals, number][])
-    .map(([key, value]) => ({
-      key,
-      label: LABELS[key] ?? key,
-      value,
-      color: SEGMENT_COLOR[key] ?? "#ccc",
-    }))
+  // Filter zero/negative slices, sort largest first.
+  const segments = rawSegments
     .filter((s) => s.value > 0)
     .sort((a, b) => b.value - a.value);
 
   const total = segments.reduce((s, seg) => s + seg.value, 0);
-  const net = income - total;
+  const net = (income ?? 0) - total;
 
   const [progress, setProgress] = useState(0);
   const rafRef = useRef<number | null>(null);
 
-  // Re-trigger animation whenever total changes
+  // Re-trigger animation whenever total OR the active drill-down changes.
   useEffect(() => {
     const start = Date.now();
     const duration = 1100;
@@ -84,12 +83,15 @@ export function SpendingDonut({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [total]);
+  }, [total, activeKey]);
 
-  // Default center readout: LEFT / remaining (income − spent).
-  // Callers may override with centerLabel + centerValue (e.g. "TOP / Savings").
-  const defaultLabel = "LEFT";
-  const defaultValue = fmt(Math.abs(net), { compact: true });
+  // Default center readout: LEFT / remaining (income − spent) when income
+  // was supplied; otherwise just the total.
+  const defaultLabel = income !== undefined ? "LEFT" : "TOTAL";
+  const defaultValue =
+    income !== undefined
+      ? fmt(Math.abs(net), { compact: true })
+      : fmt(total, { compact: true });
 
   // Compute strokeDasharray + offset for each segment, factoring progress.
   // We rotate the entire <G> -90deg to start at 12 o'clock.
@@ -118,20 +120,24 @@ export function SpendingDonut({
                 fill="none"
               />
               {/* segments */}
-              {arcs.map((arc) => (
-                <Circle
-                  key={arc.key}
-                  cx={cx}
-                  cy={cy}
-                  r={r}
-                  stroke={arc.color}
-                  strokeWidth={thickness}
-                  fill="none"
-                  strokeDasharray={`${arc.len} ${C - arc.len}`}
-                  strokeDashoffset={-arc.offset}
-                  strokeLinecap="round"
-                />
-              ))}
+              {arcs.map((arc) => {
+                const dim = activeKey != null && activeKey !== arc.key;
+                return (
+                  <Circle
+                    key={arc.key}
+                    cx={cx}
+                    cy={cy}
+                    r={r}
+                    stroke={arc.color}
+                    strokeWidth={thickness}
+                    fill="none"
+                    strokeDasharray={`${arc.len} ${C - arc.len}`}
+                    strokeDashoffset={-arc.offset}
+                    strokeLinecap="round"
+                    opacity={dim ? 0.25 : 1}
+                  />
+                );
+              })}
             </G>
           </Svg>
           {/* Center readout */}
@@ -157,13 +163,18 @@ export function SpendingDonut({
         <View style={styles.legend}>
           {segments.length === 0 ? (
             <Txt variant="caption" color={v7Text.tertiary}>
-              No spending yet
+              No data yet
             </Txt>
           ) : (
             segments.map((seg) => {
               const pct = total > 0 ? Math.round((seg.value / total) * 100) : 0;
-              return (
-                <View key={seg.key} style={styles.legendRow}>
+              const dim = activeKey != null && activeKey !== seg.key;
+              const isPressable = !!onSegmentPress;
+              const inner = (
+                <View
+                  style={[styles.legendRow, dim && { opacity: 0.4 }]}
+                  key={seg.key}
+                >
                   <View style={[styles.dot, { backgroundColor: seg.color }]} />
                   <View style={{ flex: 1 }}>
                     <Txt variant="bodyMd" color={v7Text.primary}>
@@ -181,6 +192,16 @@ export function SpendingDonut({
                     {pct}%
                   </Txt>
                 </View>
+              );
+              if (!isPressable) return inner;
+              return (
+                <Pressable
+                  key={seg.key}
+                  onPress={() => onSegmentPress?.(seg.key)}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                >
+                  {inner}
+                </Pressable>
               );
             })
           )}

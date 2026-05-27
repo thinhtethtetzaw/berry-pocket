@@ -6,12 +6,15 @@ import {
   radius,
   space,
   CATEGORY_BRAND,
-  CATEGORY_PASTEL,
   v7Accent,
 } from "../theme";
 import { fmt, formatDate } from "../lib/format";
 import type { Transaction } from "../lib/budget";
-import { MAIN_CATEGORIES, SUB_CATEGORIES } from "../lib/budget";
+import {
+  useAllMainCategories,
+  useAllSubCategories,
+  type CustomMain,
+} from "../lib/storage";
 import { Icon } from "./Icon";
 import { Txt } from "./Txt";
 
@@ -25,10 +28,16 @@ interface Props {
 
 export function TransactionRow({ tx, onPress, inline, hideDate }: Props) {
   const { theme } = useTheme();
-  const main = MAIN_CATEGORIES.find((m) => m.id === tx.main);
-  const sub = SUB_CATEGORIES.find((s) => s.id === tx.cat);
-  const brand = CATEGORY_BRAND[tx.main];
-  const pastel = CATEGORY_PASTEL[tx.main];
+  const mainCategories = useAllMainCategories();
+  const subCategories = useAllSubCategories();
+  const main = mainCategories.find((m) => m.id === tx.main);
+  const sub = subCategories.find((s) => s.id === tx.cat);
+  // Built-in brand colors are keyed by MainCategoryId; for custom categories
+  // we fall back to the user-chosen color saved on the CustomMain itself.
+  const brandBg =
+    CATEGORY_BRAND[tx.main]?.bg ??
+    (main as CustomMain | undefined)?.color ??
+    theme.steel;
   const isIncome = main?.type === "in";
 
   const wrapStyle = inline
@@ -55,7 +64,7 @@ export function TransactionRow({ tx, onPress, inline, hideDate }: Props) {
         <Icon
           name={sub?.icon ?? main?.icon ?? "Circle"}
           size={20}
-          color={brand.bg}
+          color={brandBg}
           strokeWidth={2.2}
         />
       </View>

@@ -12,7 +12,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Minus, Plus } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
 import { palette, radius, space } from "../theme";
-import { useMonthData, useCurrency } from "../lib/storage";
+import {
+  useMonthData,
+  useCurrency,
+  useAllMainCategories,
+  type CustomMain,
+} from "../lib/storage";
 import { AppHeader } from "../components/AppHeader";
 import { TransactionRow } from "../components/TransactionRow";
 import { TransactionSheet } from "../components/TransactionSheet";
@@ -23,9 +28,9 @@ import { SectionLabel } from "../components/SectionLabel";
 import { Icon } from "../components/Icon";
 import { Txt } from "../components/Txt";
 import { fmt, MONTHS_SHORT } from "../lib/format";
-import { MAIN_CATEGORIES } from "../lib/budget";
 import type { MainCategoryId, Transaction } from "../lib/budget";
 import { categoryAccent } from "../components/categoryAccent";
+import { CATEGORY_BRAND } from "../theme";
 
 export function TransactionsScreen() {
   const { theme } = useTheme();
@@ -34,6 +39,7 @@ export function TransactionsScreen() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [filter, setFilter] = useState<MainCategoryId | "all">("all");
+  const mainCategories = useAllMainCategories();
 
   // Allow other screens to navigate here with a pre-set filter
   // (e.g. Home → tap "Living" allocation tile → opens Activity filtered to Living).
@@ -98,6 +104,11 @@ export function TransactionsScreen() {
       if (!map[tx.date]) map[tx.date] = [];
       map[tx.date].push(tx);
     }
+    // Days: newest day on top. Within each day: latest entry on top
+    // (id is Date.now() at insertion → higher id = more recent).
+    for (const date in map) {
+      map[date].sort((a, b) => b.id - a.id);
+    }
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filtered]);
 
@@ -160,7 +171,10 @@ export function TransactionsScreen() {
             onPress={() => setFilter("all")}
             color={theme.ink}
           />
-          {/* Custom order — Living right after Income (matches the rest after) */}
+          {/* Custom order — Living right after Income (matches the rest after).
+              Custom categories (not in `order`) get index -1 from indexOf, which
+              sorts them BEFORE built-ins, so we map them to Infinity to push
+              them to the end. */}
           {(() => {
             const order: MainCategoryId[] = [
               "income",
@@ -170,15 +184,23 @@ export function TransactionsScreen() {
               "fixed",
               "rosca",
             ];
-            return [...MAIN_CATEGORIES]
-              .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+            const rank = (id: MainCategoryId) => {
+              const i = order.indexOf(id);
+              return i === -1 ? Infinity : i;
+            };
+            return [...mainCategories]
+              .sort((a, b) => rank(a.id) - rank(b.id))
               .map((m) => (
                 <FilterPill
                   key={m.id}
                   label={m.label}
                   active={filter === m.id}
                   onPress={() => setFilter(m.id)}
-                  color={categoryAccent(m.id, "light")}
+                  color={
+                    CATEGORY_BRAND[m.id]
+                      ? categoryAccent(m.id, "light")
+                      : ((m as CustomMain).color ?? theme.ink)
+                  }
                   icon={m.icon}
                 />
               ));

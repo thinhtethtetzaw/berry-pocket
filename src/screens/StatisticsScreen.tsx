@@ -9,20 +9,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { Pencil, ArrowUp, Trash2, ShieldCheck } from "lucide-react-native";
+import { ArrowUp, Trash2, ShieldCheck, Wallet } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
 import {
   palette,
   radius,
   space,
   CATEGORY_GRADIENT,
-  CHART_PALETTE,
   v7Text,
   v7Surface,
   v7Accent,
 } from "../theme";
 import { DailySpendBars } from "../components/DailySpendBars";
-import { TransactionRow } from "../components/TransactionRow";
 import { IncomeExpenseSummary } from "../components/IncomeExpenseSummary";
 import { DatePickerField } from "../components/DatePickerField";
 import {
@@ -31,16 +29,16 @@ import {
   useNecessaryWithdrawals,
   useAllTransactions,
   useCurrency,
+  useAllMainCategories,
 } from "../lib/storage";
 import { AppHeader } from "../components/AppHeader";
 import { PageBackground } from "../components/PageBackground";
 import { SectionLabel } from "../components/SectionLabel";
-import { SpendingDonut } from "../components/SpendingDonut";
+import { CategoryBreakdownCard } from "../components/CategoryBreakdownCard";
 import { DateFilterPills, RangePreset } from "../components/DateFilterPills";
-import { EditAmountSheet } from "../components/EditAmountSheet";
 import { UseNecessaryFundSheet } from "../components/UseNecessaryFundSheet";
 import { Txt } from "../components/Txt";
-import { fmt, MONTHS_SHORT } from "../lib/format";
+import { fmt } from "../lib/format";
 import type { Transaction } from "../lib/budget";
 
 type DatedTx = Transaction & { year: number; month: number };
@@ -68,19 +66,6 @@ function getRange(preset: RangePreset, custom: Range): Range {
   return custom;
 }
 
-function formatTopTxDate(iso: string): string {
-  const d = new Date(iso + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const stripped = new Date(d);
-  stripped.setHours(0, 0, 0, 0);
-  if (stripped.getTime() === today.getTime()) return "TODAY";
-  if (stripped.getTime() === yesterday.getTime()) return "YESTERDAY";
-  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()].toUpperCase()} ${d.getFullYear()}`;
-}
-
 function inRange(tx: DatedTx, r: Range): boolean {
   const txKey = tx.year * 12 + tx.month;
   return txKey >= r.startY * 12 + r.startM && txKey <= r.endY * 12 + r.endM;
@@ -90,14 +75,15 @@ export function StatisticsScreen() {
   const { theme } = useTheme();
   useCurrency(); // re-render when currency symbol changes
   const today = new Date();
-  const { total, setManual: setTotal } = useTotal();
-  const { fund, setManual: setFund } = useNecessaryFund();
+  const { total } = useTotal();
+  const { fund } = useNecessaryFund();
   const {
     withdrawals,
     add: addWithdrawal,
     remove: removeWithdrawal,
   } = useNecessaryWithdrawals();
   const { transactions } = useAllTransactions();
+  const mainCategories = useAllMainCategories();
 
   const [preset, setPreset] = useState<RangePreset>("thisMonth");
   const [custom, setCustom] = useState<Range>({
@@ -107,8 +93,6 @@ export function StatisticsScreen() {
     endM: today.getMonth(),
   });
 
-  const [editTotalOpen, setEditTotalOpen] = useState(false);
-  const [editFundOpen, setEditFundOpen] = useState(false);
   const [useFundOpen, setUseFundOpen] = useState(false);
 
   const range = useMemo(() => getRange(preset, custom), [preset, custom]);
@@ -119,6 +103,9 @@ export function StatisticsScreen() {
   );
 
   const totals = useMemo(() => {
+    // Built-in slots are kept named so the existing UI (cards / hero) can
+    // still reference them directly. Custom mains are accumulated into
+    // `customOut` / `customIn` based on their type.
     const t = {
       income: 0,
       savings: 0,
@@ -126,21 +113,40 @@ export function StatisticsScreen() {
       fixed: 0,
       rosca: 0,
       living: 0,
+      customIn: 0,
+      customOut: 0,
     };
-    for (const tx of filtered) t[tx.main] += tx.amount;
+    // Look up each main's `type` once so we can route unknown ids correctly.
+    const typeById: Record<string, "in" | "out"> = {};
+    for (const m of mainCategories) typeById[m.id] = m.type;
+    const builtin = new Set([
+      "income",
+      "savings",
+      "necessary",
+      "fixed",
+      "rosca",
+      "living",
+    ]);
+    for (const tx of filtered) {
+      if (builtin.has(tx.main)) {
+        // Built-in main → use its named slot.
+        (t as Record<string, number>)[tx.main] += tx.amount;
+      } else if (typeById[tx.main] === "in") {
+        t.customIn += tx.amount;
+      } else if (typeById[tx.main] === "out") {
+        t.customOut += tx.amount;
+      }
+      // Unknown / deleted main → silently ignored.
+    }
     return t;
-  }, [filtered]);
+  }, [filtered, mainCategories]);
 
-  // All outflows (used for donut breakdown and "total spending" headline that
-  // shows the full breakdown including transfers to Total/Fund).
-  const totalSpent =
-    totals.savings +
-    totals.necessary +
-    totals.living +
-    totals.rosca +
-    totals.fixed;
   // True expense — savings + necessary are transfers, not expenses.
-  const trueExpense = totals.living + totals.rosca + totals.fixed;
+  // Custom outflow mains are included so user-defined categories count too.
+  const trueExpense =
+    totals.living + totals.rosca + totals.fixed + totals.customOut;
+  // Total income including any custom income mains.
+  const totalIncome = totals.income + totals.customIn;
 
   // Last-7-days daily spend bars (expenses only — income excluded).
   const { dailyBars, dailyAvg } = useMemo(() => {
@@ -169,14 +175,6 @@ export function StatisticsScreen() {
       dailyAvg: Math.round(sum / 7),
     };
   }, [transactions]);
-
-  // Top 3 transactions (expenses) in the filter range
-  const topTxs = useMemo(() => {
-    return filtered
-      .filter((t) => t.main !== "income")
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 3);
-  }, [filtered]);
 
   function confirmDeleteWithdrawal(id: number) {
     Alert.alert(
@@ -213,145 +211,112 @@ export function StatisticsScreen() {
           showMonthNav={false}
         />
 
-        {/* Total Amount — flat hero with fund-portion progress bar */}
-        <View style={styles.totalHeroRow}>
-          <Txt
-            variant="microBold"
-            color={v7Text.tertiary}
-            style={styles.eyebrow}
-          >
-            TOTAL AMOUNT
-          </Txt>
-          <Pressable
-            onPress={() => setEditTotalOpen(true)}
-            hitSlop={8}
-            style={styles.editPlain}
-          >
-            <Pencil size={13} color={v7Text.tertiary} strokeWidth={2} />
-          </Pressable>
-        </View>
-        <Txt
-          variant="heroDisplay"
-          color={v7Text.primary}
-          style={styles.totalAmount}
-        >
-          {fmt(total)}
-        </Txt>
-        {/* Stacked bar: fund share vs free */}
-        <View style={styles.fundBar}>
-          <View
-            style={{
-              width: `${total > 0 ? Math.min(100, (fund / total) * 100) : 0}%`,
-              height: "100%",
-              backgroundColor: v7Accent.fund,
-              opacity: 0.85,
-            }}
-          />
-        </View>
-        <View style={styles.fundBarLegend}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <View
-              style={[styles.legendDot, { backgroundColor: v7Accent.fund }]}
+        {/* Hero row — Total Amount + Necessary Fund as twin pastel cards.
+            Editing both lives in Settings → Money. */}
+        <View style={styles.heroRow}>
+          {/* All my money */}
+          <View style={styles.heroCard}>
+            <LinearGradient
+              colors={CATEGORY_GRADIENT.income}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
             />
-            <Txt variant="caption" color={v7Text.secondary}>
-              Necessary Fund {total > 0 ? Math.round((fund / total) * 100) : 0}%
-            </Txt>
-          </View>
-          <Txt variant="caption" color={v7Text.tertiary}>
-            Free savings{" "}
-            {total > 0 ? Math.round(100 - (fund / total) * 100) : 100}%
-          </Txt>
-        </View>
-
-        {/* Necessary Fund — pastel-glass hero card */}
-        <View style={styles.fundCardV7}>
-          <LinearGradient
-            colors={CATEGORY_GRADIENT.necessary}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: v7Surface.blurWash },
-            ]}
-          />
-
-          <View style={styles.fundContent}>
-            <View style={styles.fundTop}>
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: v7Surface.blurWash },
+              ]}
+            />
+            <View style={styles.heroContent}>
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                style={[styles.heroIcon, { backgroundColor: v7Accent.success }]}
               >
-                <View
-                  style={[styles.fundIcon, { backgroundColor: v7Accent.fund }]}
-                >
-                  <ShieldCheck size={16} color="#FFFFFF" strokeWidth={2.2} />
-                </View>
-                <View>
-                  <Txt
-                    variant="microBold"
-                    color={v7Accent.fund}
-                    style={styles.eyebrow}
-                  >
-                    NECESSARY FUND
-                  </Txt>
-                  <Txt variant="caption" color={v7Text.secondary}>
-                    For things you really need
-                  </Txt>
-                </View>
+                <Wallet size={15} color="#FFFFFF" strokeWidth={2.4} />
               </View>
-              <Pressable
-                onPress={() => setEditFundOpen(true)}
-                hitSlop={8}
-                style={({ pressed }) => [
-                  styles.fundEditBtn,
-                  { opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <Pencil size={13} color={v7Accent.fund} strokeWidth={2} />
-              </Pressable>
-            </View>
-
-            <View style={styles.fundAmountRow}>
               <Txt
-                variant="heroDisplay"
+                variant="microBold"
+                color={v7Accent.success}
+                style={styles.heroEyebrow}
+              >
+                ALL MY MONEY
+              </Txt>
+              <Txt
+                variant="headingLg"
                 color={v7Text.primary}
-                style={styles.fundAmount}
+                style={styles.heroAmount}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {fmt(total)}
+              </Txt>
+            </View>
+          </View>
+
+          {/* Necessary Fund */}
+          <View style={styles.heroCard}>
+            <LinearGradient
+              colors={CATEGORY_GRADIENT.necessary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: v7Surface.blurWash },
+              ]}
+            />
+            <View style={styles.heroContent}>
+              <View
+                style={[styles.heroIcon, { backgroundColor: v7Accent.fund }]}
+              >
+                <ShieldCheck size={15} color="#FFFFFF" strokeWidth={2.4} />
+              </View>
+              <Txt
+                variant="microBold"
+                color={v7Accent.fund}
+                style={styles.heroEyebrow}
+              >
+                NECESSARY FUND
+              </Txt>
+              <Txt
+                variant="headingLg"
+                color={v7Text.primary}
+                style={styles.heroAmount}
+                numberOfLines={1}
+                adjustsFontSizeToFit
               >
                 {fmt(fund)}
               </Txt>
-              <Txt variant="caption" color={v7Text.secondary}>
-                of {fmt(total)}
-              </Txt>
             </View>
-
-            <Pressable
-              onPress={() => setUseFundOpen(true)}
-              disabled={fund <= 0}
-              style={({ pressed }) => [
-                styles.useFundBtnV7,
-                {
-                  backgroundColor:
-                    fund <= 0 ? "rgba(255,255,255,0.5)" : v7Accent.fund,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <ArrowUp
-                size={14}
-                color={fund <= 0 ? v7Text.tertiary : "#FFFFFF"}
-                strokeWidth={2.4}
-              />
-              <Txt
-                variant="buttonMd"
-                color={fund <= 0 ? v7Text.tertiary : "#FFFFFF"}
-              >
-                Use Fund
-              </Txt>
-            </Pressable>
           </View>
         </View>
+
+        {/* Use Fund — full-width action below the two cards */}
+        <Pressable
+          onPress={() => setUseFundOpen(true)}
+          disabled={fund <= 0}
+          style={({ pressed }) => [
+            styles.useFundBtnV7,
+            {
+              backgroundColor: fund <= 0 ? v7Surface.plainCard : v7Accent.fund,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <ArrowUp
+            size={14}
+            color={fund <= 0 ? v7Text.tertiary : "#FFFFFF"}
+            strokeWidth={2.4}
+          />
+          <Txt
+            variant="buttonMd"
+            color={fund <= 0 ? v7Text.tertiary : "#FFFFFF"}
+          >
+            Use Necessary Fund
+          </Txt>
+        </Pressable>
 
         <View style={{ height: space.lg }} />
         <SectionLabel title="Spending breakdown" />
@@ -396,105 +361,32 @@ export function StatisticsScreen() {
         <View style={{ height: space.md }} />
 
         {/* Income / Expense summary for the filter range */}
-        <IncomeExpenseSummary income={totals.income} expense={trueExpense} />
+        <IncomeExpenseSummary income={totalIncome} expense={trueExpense} />
 
         <View style={{ height: space.md }} />
 
-        {/* By-category card with eyebrow + total spend headline + donut + legend */}
-        <View style={styles.byCatCard}>
-          <View style={{ padding: space.md }}>
-            <Txt
-              variant="microBold"
-              color={v7Text.secondary}
-              style={styles.eyebrow}
-            >
-              BY CATEGORY
-            </Txt>
+        {/* Expense breakdown — tap a slice to drill into sub-categories.
+            Source = useAllMainCategories / useAllSubCategories, so custom
+            categories from Settings show up here automatically. */}
+        <CategoryBreakdownCard
+          title="Where money goes"
+          transactions={filtered}
+          side="out"
+        />
 
-            <Txt
-              variant="heroDisplay"
-              color={v7Text.primary}
-              style={styles.byCatAmount}
-            >
-              {fmt(totalSpent)}
-            </Txt>
-            <Txt variant="caption" color={v7Text.secondary}>
-              Total spending ·{" "}
-              {preset === "thisMonth"
-                ? "this month"
-                : preset === "lastMonth"
-                  ? "last month"
-                  : preset === "thisYear"
-                    ? "this year"
-                    : preset === "allTime"
-                      ? "all time"
-                      : "custom range"}
-            </Txt>
-          </View>
-          <SpendingDonut
-            income={totals.income}
-            totals={{
-              savings: totals.savings,
-              necessary: totals.necessary,
-              living: totals.living,
-              rosca: totals.rosca,
-              fixed: totals.fixed,
-            }}
-            centerLabel="TOP"
-            centerValue={(() => {
-              const entries = Object.entries({
-                Savings: totals.savings,
-                Necessary: totals.necessary,
-                Living: totals.living,
-                ROSCA: totals.rosca,
-                Fixed: totals.fixed,
-              }).sort((a, b) => b[1] - a[1]);
-              return entries[0]?.[1] > 0 ? entries[0][0] : "—";
-            })()}
-          />
-        </View>
+        <View style={{ height: space.md }} />
+
+        {/* Income breakdown — same drill-down, scoped to income mains. */}
+        <CategoryBreakdownCard
+          title="Where money comes from"
+          transactions={filtered}
+          side="in"
+        />
 
         <View style={{ height: space.md }} />
 
         {/* Daily spend bar chart — last 7 days of expenses */}
         <DailySpendBars days={dailyBars} avg={dailyAvg} title="Last 7 days" />
-
-        {/* Top transactions — grouped by date, headers as subtitles */}
-        {topTxs.length > 0 && (
-          <>
-            <View style={{ height: space.xl }} />
-            <Txt
-              variant="bodyMdBold"
-              color={v7Text.primary}
-              style={styles.sectionTitle}
-            >
-              Top transactions
-            </Txt>
-            {Object.entries(
-              topTxs.reduce<Record<string, typeof topTxs>>((acc, tx) => {
-                (acc[tx.date] ??= []).push(tx);
-                return acc;
-              }, {}),
-            )
-              .sort((a, b) => b[0].localeCompare(a[0]))
-              .map(([date, txs]) => (
-                <View key={date} style={{ marginBottom: space.md }}>
-                  <Txt
-                    variant="microBold"
-                    color={v7Text.tertiary}
-                    style={styles.dateGroupHeader}
-                  >
-                    {formatTopTxDate(date)}
-                  </Txt>
-                  <View style={{ gap: 8 }}>
-                    {txs.map((tx) => (
-                      <TransactionRow key={tx.id} tx={tx} hideDate />
-                    ))}
-                  </View>
-                </View>
-              ))}
-          </>
-        )}
 
         {/* Withdrawals log */}
         {withdrawals.length > 0 && (
@@ -550,23 +442,6 @@ export function StatisticsScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <EditAmountSheet
-        visible={editTotalOpen}
-        title="Edit Total Amount"
-        hint="Adjust your overall balance — useful when you want to set a starting value or correct drift."
-        initialValue={total}
-        onClose={() => setEditTotalOpen(false)}
-        onSave={setTotal}
-      />
-      <EditAmountSheet
-        visible={editFundOpen}
-        title="Edit Necessary Fund"
-        hint="This is a subset of Total. Editing it doesn't change Total — they're two separate trackers."
-        initialValue={fund}
-        accent={v7Accent.fund}
-        onClose={() => setEditFundOpen(false)}
-        onSave={setFund}
-      />
       <UseNecessaryFundSheet
         visible={useFundOpen}
         fundBalance={fund}
@@ -618,122 +493,50 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: space.lg, paddingTop: space.sm },
   eyebrow: { textTransform: "uppercase", letterSpacing: 1.4 },
 
-  // ── Total (flat hero) ──
-  totalHeroRow: {
+  // ── Twin pastel-glass hero cards ──
+  heroRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 2,
+    gap: 12,
   },
-  editPlain: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  totalAmount: {
-    fontSize: 42,
-    letterSpacing: -1.5,
-    lineHeight: 48,
-    marginBottom: 12,
-  },
-  fundBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: "hidden",
-    backgroundColor: "#F1F2F7",
-  },
-  fundBarLegend: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-    marginBottom: space.lg,
-  },
-  legendDot: { width: 7, height: 7, borderRadius: 4 },
-
-  // ── Necessary Fund pastel-glass card ──
-  fundCardV7: {
+  heroCard: {
+    flex: 1,
+    minWidth: 0,
     borderRadius: radius.xl,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: v7Surface.hairline,
+    minHeight: 152,
   },
-  fundContent: { padding: space.lg },
-  fundTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+  heroContent: {
+    padding: space.md,
+    gap: 4,
   },
-  fundIcon: {
-    width: 32,
-    height: 32,
+  heroIcon: {
+    width: 30,
+    height: 30,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 6,
   },
-  fundEditBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    alignItems: "center",
-    justifyContent: "center",
+  heroEyebrow: {
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
   },
-  fundAmountRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-    marginTop: 14,
-  },
-  fundAmount: {
-    fontSize: 34,
-    letterSpacing: -1,
+  heroAmount: {
+    fontSize: 26,
+    letterSpacing: -0.8,
+    marginTop: 4,
+    marginBottom: 2,
   },
   useFundBtnV7: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    height: 42,
-    borderRadius: 12,
-    marginTop: 14,
-  },
-
-  // ── By-category card ──
-  byCatCard: {
-    backgroundColor: v7Surface.plainCard,
-    borderRadius: radius.xl,
-  },
-  byCatAmount: {
-    fontSize: 28,
-    letterSpacing: -0.8,
-  },
-  sectionTitle: {
-    letterSpacing: -0.3,
-    marginBottom: 12,
-  },
-  dateGroupHeader: {
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  topTxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    backgroundColor: v7Surface.plainCard,
+    height: 44,
     borderRadius: 14,
-  },
-  txIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+    marginTop: 12,
   },
 
   // ── Other ──

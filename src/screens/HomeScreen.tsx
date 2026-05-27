@@ -13,7 +13,9 @@ import {
   useLastSeenMonth,
   useTotal,
   useCurrency,
+  useAllMainCategories,
 } from "../lib/storage";
+import { buildMainSegments } from "../lib/categoryStats";
 import { MonthRolloverModal } from "../components/MonthRolloverModal";
 import { Shimmer } from "../components/Shimmer";
 import { AppHeader } from "../components/AppHeader";
@@ -101,6 +103,14 @@ export function HomeScreen() {
   const { budget, update: updateBudget } = useBudget(year, month);
   const { fixed, update: updateFixed } = useFixed(year, month);
   const { total } = useTotal();
+  const mainCategories = useAllMainCategories();
+
+  // Donut segments: aggregate transactions across ALL outflow mains
+  // (built-in + custom). Updating Settings → Manage categories flows here.
+  const donutSegments = useMemo(
+    () => buildMainSegments(transactions, mainCategories, "out"),
+    [transactions, mainCategories],
+  );
 
   const totals = useMemo(() => {
     const t = {
@@ -282,16 +292,7 @@ export function HomeScreen() {
 
         <View style={{ height: space.xl }} />
         <SectionLabel title="Spending overview" />
-        <SpendingDonut
-          income={totals.income}
-          totals={{
-            savings: totals.savings,
-            necessary: totals.necessary,
-            living: totals.living,
-            rosca: totals.rosca,
-            fixed: totals.fixed,
-          }}
-        />
+        <SpendingDonut income={totals.income} segments={donutSegments} />
 
         <View style={{ height: space.xl }} />
         <SectionLabel title="Recent activity" />

@@ -43,7 +43,7 @@ export function HeroBalance({
   return (
     <View style={styles.wrap}>
       <Txt variant="cardTitle" color={v7Text.tertiary} style={styles.eyebrow}>
-        WALLET BALANCE
+        THIS MONTH BALANCE
       </Txt>
 
       <View style={styles.amountRow}>
@@ -73,7 +73,7 @@ export function HeroBalance({
               color={v7Text.tertiary}
               style={styles.summaryLabel}
             >
-              TOTAL AMOUNT
+              My total
             </Txt>
             <Txt variant="bodyMdBold" color={v7Text.primary}>
               {hidden ? "฿••••••" : `฿${(totalSaved ?? 0).toLocaleString()}`}
@@ -91,7 +91,7 @@ export function HeroBalance({
               color={v7Accent.success}
               style={styles.summaryLabel}
             >
-              This month
+              EOM saving +
             </Txt>
             <Txt variant="bodyMdBold" color={v7Text.primary}>
               {hidden ? "฿••••••" : `฿${(endOfMonth ?? 0).toLocaleString()}`}

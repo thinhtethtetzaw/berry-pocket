@@ -13,13 +13,16 @@ import {
 // full-screen sheet — height removed, flex: 1 used instead
 import { X, Trash2 } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
-import { palette, radius, space, v7Accent } from "../theme";
-import { MAIN_CATEGORIES, SUB_CATEGORIES } from "../lib/budget";
+import { palette, radius, space, v7Accent, CATEGORY_BRAND } from "../theme";
 import type { MainCategoryId, Transaction } from "../lib/budget";
+import {
+  useAllMainCategories,
+  useAllSubCategories,
+  type CustomMain,
+} from "../lib/storage";
 import { todayISO } from "../lib/format";
 import { Icon } from "./Icon";
 import { Txt } from "./Txt";
-import { categoryAccent } from "./categoryAccent";
 import { DatePickerField } from "./DatePickerField";
 
 interface Props {
@@ -42,13 +45,15 @@ export function TransactionSheet({
   defaultMain = "living",
 }: Props) {
   const { theme } = useTheme();
+  const mainCategories = useAllMainCategories();
+  const subCategories = useAllSubCategories();
   const [main, setMain] = useState<MainCategoryId>("living");
   const [cat, setCat] = useState("food");
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayISO());
   const isEdit = !!editing;
-  const isIncome = MAIN_CATEGORIES.find((m) => m.id === main)?.type === "in";
+  const isIncome = mainCategories.find((m) => m.id === main)?.type === "in";
   const accentColor = isIncome ? palette.successText : v7Accent.danger;
   const accentBg = isIncome ? "#DEF1E6" : "#FCE5DC";
 
@@ -65,26 +70,26 @@ export function TransactionSheet({
       setDesc("");
       setAmount("");
       setMain(defaultMain);
-      const firstSub = SUB_CATEGORIES.find((c) => c.main === defaultMain);
+      const firstSub = subCategories.find((c) => c.main === defaultMain);
       if (firstSub) setCat(firstSub.id);
     }
   }, [visible, editing]);
 
   useEffect(() => {
     if (editing && main === editing.main) return;
-    const first = SUB_CATEGORIES.find((c) => c.main === main);
+    const first = subCategories.find((c) => c.main === main);
     if (first) setCat(first.id);
   }, [main, editing]);
 
   // Income sheet locks to income category only; expense sheet hides income
   const isIncomeMode = defaultMain === "income" && !editing;
   const visibleCategories = editing
-    ? MAIN_CATEGORIES
+    ? mainCategories
     : isIncomeMode
-      ? MAIN_CATEGORIES.filter((m) => m.type === "in")
-      : MAIN_CATEGORIES.filter((m) => m.type === "out");
+      ? mainCategories.filter((m) => m.type === "in")
+      : mainCategories.filter((m) => m.type === "out");
 
-  const subs = SUB_CATEGORIES.filter((c) => c.main === main);
+  const subs = subCategories.filter((c) => c.main === main);
 
   function submit() {
     const amt = parseFloat(amount);
@@ -182,7 +187,10 @@ export function TransactionSheet({
               {!isIncomeMode && (
                 <View style={S.pillRow}>
                   {visibleCategories.map((m) => {
-                    const accent = categoryAccent(m.id, "light");
+                    const accent =
+                      CATEGORY_BRAND[m.id]?.bg ??
+                      (m as CustomMain).color ??
+                      theme.steel;
                     const active = main === m.id;
                     return (
                       <Pressable
@@ -221,7 +229,13 @@ export function TransactionSheet({
                   <View style={S.pillRow}>
                     {subs.map((s) => {
                       const active = cat === s.id;
-                      const accent = categoryAccent(main, "light");
+                      const parentMain = mainCategories.find(
+                        (m) => m.id === main,
+                      );
+                      const accent =
+                        CATEGORY_BRAND[main]?.bg ??
+                        (parentMain as CustomMain | undefined)?.color ??
+                        theme.steel;
                       return (
                         <Pressable
                           key={s.id}

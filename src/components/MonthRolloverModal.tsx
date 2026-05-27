@@ -8,7 +8,8 @@ import { fmt, MONTHS_SHORT } from '../lib/format';
 import { Txt } from './Txt';
 import { SpendingDonut } from './SpendingDonut';
 import type { Transaction } from '../lib/budget';
-import { MAIN_CATEGORIES } from '../lib/budget';
+import { useAllMainCategories } from '../lib/storage';
+import { buildMainSegments } from '../lib/categoryStats';
 
 interface Props {
   visible: boolean;
@@ -30,7 +31,9 @@ interface Snapshot {
 export function MonthRolloverModal({ visible, prevYear, prevMonth, onContinue }: Props) {
   const { theme } = useTheme();
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  const [txs, setTxs] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const mainCategories = useAllMainCategories();
 
   useEffect(() => {
     if (!visible) return;
@@ -40,16 +43,27 @@ export function MonthRolloverModal({ visible, prevYear, prevMonth, onContinue }:
       const key = `bb:month:${prevYear}-${String(prevMonth + 1).padStart(2, '0')}`;
       try {
         const raw = await AsyncStorage.getItem(key);
-        const txs: Transaction[] = raw ? JSON.parse(raw) : [];
-        const t: Snapshot = { income: 0, savings: 0, necessary: 0, living: 0, rosca: 0, fixed: 0, txCount: txs.length };
-        for (const tx of txs) t[tx.main] += tx.amount;
-        if (alive) { setSnap(t); setLoading(false); }
+        const parsed: Transaction[] = raw ? JSON.parse(raw) : [];
+        const t: Snapshot = { income: 0, savings: 0, necessary: 0, living: 0, rosca: 0, fixed: 0, txCount: parsed.length };
+        for (const tx of parsed) {
+          if (t[tx.main as keyof Snapshot] !== undefined && tx.main !== 'income') {
+            t[tx.main as keyof Snapshot] = (t[tx.main as keyof Snapshot] as number) + tx.amount;
+          } else if (tx.main === 'income') {
+            t.income += tx.amount;
+          }
+        }
+        if (alive) { setSnap(t); setTxs(parsed); setLoading(false); }
       } catch {
-        if (alive) { setSnap(null); setLoading(false); }
+        if (alive) { setSnap(null); setTxs([]); setLoading(false); }
       }
     })();
     return () => { alive = false; };
   }, [visible, prevYear, prevMonth]);
+
+  const donutSegments = useMemo(
+    () => buildMainSegments(txs, mainCategories, 'out'),
+    [txs, mainCategories],
+  );
 
   const totalSpent = useMemo(() => {
     if (!snap) return 0;
@@ -127,13 +141,7 @@ export function MonthRolloverModal({ visible, prevYear, prevMonth, onContinue }:
                 <View style={{ height: space.md }} />
                 <SpendingDonut
                   income={snap.income}
-                  totals={{
-                    savings:   snap.savings,
-                    necessary: snap.necessary,
-                    living:    snap.living,
-                    rosca:     snap.rosca,
-                    fixed:     snap.fixed,
-                  }}
+                  segments={donutSegments}
                   size={140}
                 />
 

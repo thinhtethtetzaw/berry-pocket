@@ -11,6 +11,8 @@ import {
   Upload,
   Download,
   RotateCcw,
+  Wallet,
+  ShieldCheck,
 } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 // expo-file-system v19+ moved the legacy `cacheDirectory` API to a separate path.
@@ -34,6 +36,8 @@ import {
   resetConfigOnly,
   clearAllData,
   useMonthData,
+  useTotal,
+  useNecessaryFund,
 } from "../lib/storage";
 import { DEFAULT_ROSCA, DEFAULT_BUDGET, DEFAULT_FIXED } from "../lib/budget";
 import { fmt } from "../lib/format";
@@ -44,6 +48,7 @@ import { FixedItemsSheet } from "../components/FixedItemsSheet";
 import { PageBackground } from "../components/PageBackground";
 import { Txt } from "../components/Txt";
 import { OptionPickerSheet } from "../components/OptionPickerSheet";
+import { EditAmountSheet } from "../components/EditAmountSheet";
 import { CategoriesViewerSheet } from "../components/CategoriesViewerSheet";
 import { CategoryEditorSheet } from "../components/CategoryEditorSheet";
 import { SubCategoryEditorSheet } from "../components/SubCategoryEditorSheet";
@@ -90,6 +95,8 @@ export function SettingsScreen() {
   );
   const { currency, setCurrency } = useCurrency();
   const { themePref, setThemePref } = useThemePref();
+  const { total, setManual: setTotal } = useTotal();
+  const { fund, setManual: setFund } = useNecessaryFund();
 
   const [roscaOpen, setRoscaOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
@@ -97,6 +104,8 @@ export function SettingsScreen() {
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [catsOpen, setCatsOpen] = useState(false);
+  const [editTotalOpen, setEditTotalOpen] = useState(false);
+  const [editFundOpen, setEditFundOpen] = useState(false);
 
   // Category editor state (hoisted up so editors are siblings of the manager,
   // not nested — gorhom doesn't reliably handle nested BottomSheetModals)
@@ -266,6 +275,32 @@ export function SettingsScreen() {
         <SectionTitle>Money</SectionTitle>
         <View style={styles.group}>
           <Row
+            icon={<Wallet size={15} color={v7Text.primary} strokeWidth={3} />}
+            title="Total amount"
+            sub={`${fmt(total)} · all money you have`}
+            onPress={() => setEditTotalOpen(true)}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
+          />
+          <Hairline />
+          <Row
+            icon={
+              <ShieldCheck
+                size={15}
+                color={v7Text.primary}
+                strokeWidth={3}
+              />
+            }
+            title="Necessary fund"
+            sub={`${fmt(fund)} · for things you really need`}
+            onPress={() => setEditFundOpen(true)}
+            right={
+              <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
+            }
+          />
+          <Hairline />
+          <Row
             icon={
               <Txt variant="bodyMdBold" color={v7Text.primary}>
                 {currency}
@@ -415,6 +450,25 @@ export function SettingsScreen() {
         items={fixed}
         onClose={() => setFixedOpen(false)}
         onSave={updateFixed}
+      />
+
+      {/* Balance editors */}
+      <EditAmountSheet
+        visible={editTotalOpen}
+        title="Edit Total Amount"
+        hint="Adjust your overall balance — useful when you want to set a starting value or correct drift."
+        initialValue={total}
+        onClose={() => setEditTotalOpen(false)}
+        onSave={setTotal}
+      />
+      <EditAmountSheet
+        visible={editFundOpen}
+        title="Edit Necessary Fund"
+        hint="This is a subset of Total. Editing it doesn't change Total — they're two separate trackers."
+        initialValue={fund}
+        accent={v7Accent.fund}
+        onClose={() => setEditFundOpen(false)}
+        onSave={setFund}
       />
 
       {/* Preference pickers */}
