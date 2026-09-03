@@ -56,7 +56,9 @@ export function buildMainSegments(
   mains: MainCategory[],
   filter?: "in" | "out",
 ): DonutSegment[] {
-  const wanted = filter ? mains.filter((m) => m.type === filter) : mains;
+  const wanted = filter
+    ? mains.filter((m) => filter === "out" ? m.type !== "in" : m.type === "in")
+    : mains;
   // Index totals by main.id
   const totals: Record<string, number> = {};
   for (const m of wanted) totals[m.id] = 0;

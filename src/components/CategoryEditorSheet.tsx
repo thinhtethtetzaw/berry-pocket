@@ -9,6 +9,7 @@ import { Icon } from './Icon';
 import { Txt } from './Txt';
 import { IconPicker, ColorPicker, pastelFrom, COLOR_OPTIONS, ICON_OPTIONS } from './IconColorPickers';
 import type { CustomMain } from '../lib/storage';
+import type { MainCategoryType } from '../lib/budget';
 
 const SHEET_H = Dimensions.get('window').height - 60;
 
@@ -23,7 +24,7 @@ interface Props {
 export function CategoryEditorSheet({ visible, editing, onClose, onSave, onDelete }: Props) {
   const isEdit = !!editing;
   const [label, setLabel] = useState('');
-  const [type, setType] = useState<'in' | 'out'>('out');
+  const [type, setType] = useState<MainCategoryType>('out');
   const [icon, setIcon] = useState<string>(ICON_OPTIONS[0]);
   const [color, setColor] = useState<string>(COLOR_OPTIONS[0]);
 
@@ -101,7 +102,7 @@ export function CategoryEditorSheet({ visible, editing, onClose, onSave, onDelet
                   <View>
                     <Txt variant="bodyMdBold" color={v7Text.primary}>{label || 'Category name'}</Txt>
                     <Txt variant="caption" color={v7Text.tertiary}>
-                      {type === 'in' ? 'Income' : 'Expense'}
+                      {type === 'in' ? 'Income' : type === 'saving' ? 'Savings' : 'Expense'}
                     </Txt>
                   </View>
                 </View>
@@ -130,6 +131,12 @@ export function CategoryEditorSheet({ visible, editing, onClose, onSave, onDelet
                   style={[S.typeChip, type === 'in' && { backgroundColor: v7Text.primary, borderColor: v7Text.primary }]}
                 >
                   <Txt variant="bodySmMed" color={type === 'in' ? '#FFFFFF' : v7Text.primary}>Income</Txt>
+                </Pressable>
+                <Pressable
+                  onPress={() => setType('saving')}
+                  style={[S.typeChip, type === 'saving' && { backgroundColor: v7Text.primary, borderColor: v7Text.primary }]}
+                >
+                  <Txt variant="bodySmMed" color={type === 'saving' ? '#FFFFFF' : v7Text.primary}>Savings</Txt>
                 </Pressable>
               </View>
 

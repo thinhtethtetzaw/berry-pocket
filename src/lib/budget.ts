@@ -30,12 +30,14 @@ export const DEFAULT_FIXED: FixedItem[] = [
 // ─────────────────────────────────────────────────────────────────────────
 
 export type MainCategoryId = 'income' | 'savings' | 'necessary' | 'fixed' | 'rosca' | 'living';
+export type MainCategoryType = 'in' | 'out' | 'saving';
 
 export interface MainCategory {
   id: MainCategoryId;
   label: string;
   icon: string;
-  type: 'in' | 'out';
+  /** `saving` is money moved into Total Saved, not an expense. */
+  type: MainCategoryType;
 }
 
 export const MAIN_CATEGORIES: MainCategory[] = [

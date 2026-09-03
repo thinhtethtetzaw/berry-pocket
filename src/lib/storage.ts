@@ -23,6 +23,8 @@ const KEY = {
   // v1.2 — user-defined categories layered on top of built-ins
   customMains:     'bb:customMains',
   customSubs:      'bb:customSubs',
+  customSavingAdjustments: 'bb:customSavingAdjustments',
+  customSavingWithdrawals: 'bb:customSavingWithdrawals',
   // v1.2 — list of cycle keys whose payout has been received
   roscaReceipts:   'bb:roscaReceipts',
   // v1.2 — flag for one-time injection of the "For my parents" fixed entry
@@ -45,6 +47,7 @@ const CH = {
   language:     'ch:language',
   customMains:  'ch:customMains',
   customSubs:   'ch:customSubs',
+  customSavings:'ch:customSavings',
   roscaReceipts:'ch:roscaReceipts',
 };
 
@@ -59,6 +62,10 @@ export interface NecessaryWithdrawal {
   amount: number;
   description: string;
   date: string; // YYYY-MM-DD
+}
+
+export interface CustomSavingWithdrawal extends NecessaryWithdrawal {
+  categoryId: string;
 }
 
 // ─────────────────────────────── Generic ────────────────────────────────
@@ -147,15 +154,26 @@ function sumByMain(list: Transaction[], main: Transaction['main']): number {
   return list.reduce((s, t) => (t.main === main ? s + t.amount : s), 0);
 }
 
+async function customSavingsIds(): Promise<Set<string>> {
+  const mains = await get<CustomMain[]>(KEY.customMains, []);
+  return new Set(mains.filter(m => m.type === 'saving').map(m => m.id));
+}
+
+async function sumCustomSavings(list: Transaction[]): Promise<number> {
+  const ids = await customSavingsIds();
+  return list.reduce((sum, tx) => sum + (ids.has(tx.main) ? tx.amount : 0), 0);
+}
+
 async function applyTransactionDiff(prev: Transaction[], next: Transaction[]) {
   const savingsDiff   = sumByMain(next, 'savings')   - sumByMain(prev, 'savings');
+  const customSavingsDiff = (await sumCustomSavings(next)) - (await sumCustomSavings(prev));
   const necessaryDiff = sumByMain(next, 'necessary') - sumByMain(prev, 'necessary');
 
-  if (savingsDiff === 0 && necessaryDiff === 0) return;
+  if (savingsDiff === 0 && customSavingsDiff === 0 && necessaryDiff === 0) return;
 
   const total    = await get<number>(KEY.total, 0);
   const fund     = await get<number>(KEY.necessaryFund, 0);
-  const newTotal = total + savingsDiff + necessaryDiff;
+  const newTotal = total + savingsDiff + customSavingsDiff + necessaryDiff;
   const newFund  = fund + necessaryDiff;
 
   await Promise.all([
@@ -680,15 +698,37 @@ export function useCustomMains() {
     emit(CH.customMains);
   };
 
-  const upsert = (cat: CustomMain) => {
-    const exists = list.some(c => c.id === cat.id);
+  const upsert = async (cat: CustomMain) => {
+    const previous = list.find(c => c.id === cat.id);
+    const exists = !!previous;
     const next = exists ? list.map(c => (c.id === cat.id ? cat : c)) : [...list, cat];
-    return save(next);
+    await save(next);
+    if ((previous?.type === 'saving') !== (cat.type === 'saving')) {
+      await adjustTotalForSavingsClassification(cat.id, cat.type === 'saving' ? 1 : -1);
+    }
   };
 
-  const remove = (id: string) => save(list.filter(c => c.id !== id));
+  const remove = async (id: string) => {
+    const wasSaving = list.some(c => c.id === id && c.type === 'saving');
+    await save(list.filter(c => c.id !== id));
+    if (wasSaving) await adjustTotalForSavingsClassification(id, -1);
+  };
 
   return { customMains: list, upsert, remove };
+}
+
+async function adjustTotalForSavingsClassification(id: string, direction: 1 | -1) {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const monthKeys = allKeys.filter(k => k.startsWith('bb:month:'));
+  let amount = 0;
+  for (const key of monthKeys) {
+    const txs = await get<Transaction[]>(key, []);
+    amount += txs.reduce((sum, tx) => sum + (tx.main === id ? tx.amount : 0), 0);
+  }
+  if (amount === 0) return;
+  const total = await get<number>(KEY.total, 0);
+  await set(KEY.total, total + amount * direction);
+  emit(CH.total);
 }
 
 export function useCustomSubs() {
@@ -733,6 +773,82 @@ export function useAllMainCategories(): MainCategory[] {
 export function useAllSubCategories(): SubCategory[] {
   const { customSubs } = useCustomSubs();
   return useMemo(() => [...SUB_CATEGORIES, ...customSubs], [customSubs]);
+}
+
+/** All-time balances and usage logs for user-created Savings categories. */
+export function useCustomSavingFunds() {
+  const { transactions } = useAllTransactions();
+  const { customMains } = useCustomMains();
+  const [adjustments, setAdjustments] = useState<Record<string, number>>({});
+  const [withdrawals, setWithdrawals] = useState<CustomSavingWithdrawal[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const refetch = async () => {
+      const [nextAdjustments, nextWithdrawals] = await Promise.all([
+        get<Record<string, number>>(KEY.customSavingAdjustments, {}),
+        get<CustomSavingWithdrawal[]>(KEY.customSavingWithdrawals, []),
+      ]);
+      if (alive) {
+        setAdjustments(nextAdjustments);
+        setWithdrawals(nextWithdrawals);
+      }
+    };
+    refetch();
+    const unsub = subscribe(CH.customSavings, refetch);
+    return () => { alive = false; unsub(); };
+  }, []);
+
+  const savingCategories = customMains.filter(m => m.type === 'saving');
+  const balances: Record<string, number> = {};
+  for (const category of savingCategories) {
+    const contributed = transactions.reduce(
+      (sum, tx) => sum + (tx.main === category.id ? tx.amount : 0), 0,
+    );
+    const used = withdrawals.reduce(
+      (sum, w) => sum + (w.categoryId === category.id ? w.amount : 0), 0,
+    );
+    balances[category.id] = contributed - used + (adjustments[category.id] ?? 0);
+  }
+
+  const setManual = async (categoryId: string, next: number) => {
+    const current = balances[categoryId] ?? 0;
+    const delta = next - current;
+    const nextAdjustments = {
+      ...adjustments,
+      [categoryId]: (adjustments[categoryId] ?? 0) + delta,
+    };
+    setAdjustments(nextAdjustments);
+    await set(KEY.customSavingAdjustments, nextAdjustments);
+    emit(CH.customSavings);
+  };
+
+  const useFund = async (
+    categoryId: string,
+    entry: Omit<CustomSavingWithdrawal, 'id' | 'categoryId'>,
+  ) => {
+    const next = [...withdrawals, { ...entry, categoryId, id: Date.now() }];
+    setWithdrawals(next);
+    await set(KEY.customSavingWithdrawals, next);
+    const total = await get<number>(KEY.total, 0);
+    await set(KEY.total, total - entry.amount);
+    emit(CH.customSavings);
+    emit(CH.total);
+  };
+
+  const removeWithdrawal = async (id: number) => {
+    const removed = withdrawals.find(w => w.id === id);
+    if (!removed) return;
+    const next = withdrawals.filter(w => w.id !== id);
+    setWithdrawals(next);
+    await set(KEY.customSavingWithdrawals, next);
+    const total = await get<number>(KEY.total, 0);
+    await set(KEY.total, total + removed.amount);
+    emit(CH.customSavings);
+    emit(CH.total);
+  };
+
+  return { savingCategories, balances, withdrawals, setManual, useFund, removeWithdrawal };
 }
 
 // ─────────── v1.2 · ROSCA payout receipts ───────────

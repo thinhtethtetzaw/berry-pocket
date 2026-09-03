@@ -30,6 +30,7 @@ import {
   useAllTransactions,
   useCurrency,
   useAllMainCategories,
+  useCustomSavingFunds,
 } from "../lib/storage";
 import { AppHeader } from "../components/AppHeader";
 import { PageBackground } from "../components/PageBackground";
@@ -38,6 +39,7 @@ import { CategoryBreakdownCard } from "../components/CategoryBreakdownCard";
 import { DateFilterPills, RangePreset } from "../components/DateFilterPills";
 import { UseNecessaryFundSheet } from "../components/UseNecessaryFundSheet";
 import { Txt } from "../components/Txt";
+import { Icon } from "../components/Icon";
 import { fmt } from "../lib/format";
 import type { Transaction } from "../lib/budget";
 
@@ -84,6 +86,13 @@ export function StatisticsScreen() {
   } = useNecessaryWithdrawals();
   const { transactions } = useAllTransactions();
   const mainCategories = useAllMainCategories();
+  const {
+    savingCategories,
+    balances: customSavingBalances,
+    withdrawals: customSavingWithdrawals,
+    useFund: useCustomFund,
+    removeWithdrawal: removeCustomWithdrawal,
+  } = useCustomSavingFunds();
 
   const [preset, setPreset] = useState<RangePreset>("thisMonth");
   const [custom, setCustom] = useState<Range>({
@@ -94,6 +103,11 @@ export function StatisticsScreen() {
   });
 
   const [useFundOpen, setUseFundOpen] = useState(false);
+  const [activeCustomFundId, setActiveCustomFundId] = useState<string | null>(null);
+
+  // Saving-type custom categories are separate long-term pots. Their cards
+  // always show the all-time total, just like Necessary Fund.
+  const activeCustomFund = savingCategories.find(c => c.id === activeCustomFundId) ?? null;
 
   const range = useMemo(() => getRange(preset, custom), [preset, custom]);
 
@@ -115,9 +129,10 @@ export function StatisticsScreen() {
       living: 0,
       customIn: 0,
       customOut: 0,
+      customSaving: 0,
     };
     // Look up each main's `type` once so we can route unknown ids correctly.
-    const typeById: Record<string, "in" | "out"> = {};
+    const typeById: Record<string, "in" | "out" | "saving"> = {};
     for (const m of mainCategories) typeById[m.id] = m.type;
     const builtin = new Set([
       "income",
@@ -133,6 +148,8 @@ export function StatisticsScreen() {
         (t as Record<string, number>)[tx.main] += tx.amount;
       } else if (typeById[tx.main] === "in") {
         t.customIn += tx.amount;
+      } else if (typeById[tx.main] === "saving") {
+        t.customSaving += tx.amount;
       } else if (typeById[tx.main] === "out") {
         t.customOut += tx.amount;
       }
@@ -164,8 +181,15 @@ export function StatisticsScreen() {
         iso: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
       });
     }
+    const excluded = new Set(
+      mainCategories
+        .filter((m) => m.type === "in" || m.type === "saving")
+        .map((m) => m.id),
+    );
+    excluded.add("savings");
+    excluded.add("necessary");
     for (const tx of transactions) {
-      if (tx.main === "income") continue;
+      if (excluded.has(tx.main)) continue;
       const idx = buckets.findIndex((b) => b.iso === tx.date);
       if (idx >= 0) buckets[idx].v += tx.amount;
     }
@@ -174,7 +198,7 @@ export function StatisticsScreen() {
       dailyBars: buckets.map((b) => ({ d: b.d, v: b.v })),
       dailyAvg: Math.round(sum / 7),
     };
-  }, [transactions]);
+  }, [transactions, mainCategories]);
 
   function confirmDeleteWithdrawal(id: number) {
     Alert.alert(
@@ -186,6 +210,21 @@ export function StatisticsScreen() {
           text: "Remove",
           style: "destructive",
           onPress: () => removeWithdrawal(id),
+        },
+      ],
+    );
+  }
+
+  function confirmDeleteCustomWithdrawal(id: number) {
+    Alert.alert(
+      "Remove fund usage?",
+      "This will return the amount to the savings fund and All My Money.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => removeCustomWithdrawal(id),
         },
       ],
     );
@@ -292,6 +331,64 @@ export function StatisticsScreen() {
             </View>
           </View>
         </View>
+
+        {savingCategories.map((category) => (
+          <View
+            key={category.id}
+            style={[
+              styles.customSavingCard,
+              { backgroundColor: category.pastel ?? "#F6DDE4" },
+            ]}
+          >
+            <View
+              style={[
+                styles.heroIcon,
+                { backgroundColor: category.color ?? "#D85277" },
+              ]}
+            >
+              <Icon
+                name={category.icon}
+                size={15}
+                color="#FFFFFF"
+                strokeWidth={2.4}
+              />
+            </View>
+            <Txt
+              variant="microBold"
+              color={category.color ?? "#D85277"}
+              style={styles.heroEyebrow}
+            >
+              {category.label.toUpperCase()} SAVINGS
+            </Txt>
+            <Txt
+              variant="headingLg"
+              color={v7Text.primary}
+              style={styles.heroAmount}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {fmt(customSavingBalances[category.id] ?? 0)}
+            </Txt>
+            <Pressable
+              onPress={() => setActiveCustomFundId(category.id)}
+              disabled={(customSavingBalances[category.id] ?? 0) <= 0}
+              style={({ pressed }) => [
+                styles.customFundButton,
+                {
+                  backgroundColor: (customSavingBalances[category.id] ?? 0) <= 0
+                    ? "rgba(255,255,255,0.55)"
+                    : category.color,
+                  opacity: pressed ? 0.82 : 1,
+                },
+              ]}
+            >
+              <ArrowUp size={13} color={(customSavingBalances[category.id] ?? 0) <= 0 ? v7Text.tertiary : "#FFFFFF"} strokeWidth={2.4} />
+              <Txt variant="bodySmMed" color={(customSavingBalances[category.id] ?? 0) <= 0 ? v7Text.tertiary : "#FFFFFF"}>
+                Use {category.label} Fund
+              </Txt>
+            </Pressable>
+          </View>
+        ))}
 
         {/* Use Fund — full-width action below the two cards */}
         <Pressable
@@ -439,6 +536,33 @@ export function StatisticsScreen() {
           </>
         )}
 
+        {customSavingWithdrawals.length > 0 && (
+          <>
+            <View style={{ height: space.xl }} />
+            <SectionLabel title="Savings fund usage" />
+            <View style={[styles.withdrawalCard, { borderColor: theme.border }]}>
+              {customSavingWithdrawals.slice().sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id).map((w, i, arr) => {
+                const category = savingCategories.find(c => c.id === w.categoryId);
+                return (
+                  <View key={w.id}>
+                    <View style={styles.withdrawalRow}>
+                      <View style={{ flex: 1 }}>
+                        <Txt variant="bodySmMed" color={theme.ink}>{w.description || `Used ${category?.label ?? "savings"} fund`}</Txt>
+                        <Txt variant="micro" color={theme.muted} style={{ marginTop: 2 }}>{category?.label ?? "Savings"} · {w.date}</Txt>
+                      </View>
+                      <Txt variant="bodyMdBold" color={category?.color ?? v7Accent.fund}>−{fmt(w.amount, { compact: true })}</Txt>
+                      <Pressable onPress={() => confirmDeleteCustomWithdrawal(w.id)} hitSlop={8} style={{ marginLeft: 8 }}>
+                        <Trash2 size={13} color={theme.muted} strokeWidth={2} />
+                      </Pressable>
+                    </View>
+                    {i < arr.length - 1 && <View style={[styles.divider, { backgroundColor: theme.borderSoft }]} />}
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -447,6 +571,17 @@ export function StatisticsScreen() {
         fundBalance={fund}
         onClose={() => setUseFundOpen(false)}
         onSave={(w) => addWithdrawal(w)}
+      />
+      <UseNecessaryFundSheet
+        visible={!!activeCustomFund}
+        fundBalance={activeCustomFund ? (customSavingBalances[activeCustomFund.id] ?? 0) : 0}
+        title={`Use ${activeCustomFund?.label ?? "Savings"} Fund`}
+        descriptionPlaceholder="What did you use this fund for?"
+        accent={activeCustomFund?.color}
+        onClose={() => setActiveCustomFundId(null)}
+        onSave={(entry) => {
+          if (activeCustomFund) useCustomFund(activeCustomFund.id, entry);
+        }}
       />
     </SafeAreaView>
   );
@@ -510,6 +645,25 @@ const styles = StyleSheet.create({
   heroContent: {
     padding: space.md,
     gap: 4,
+  },
+  customSavingCard: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: v7Surface.hairline,
+    minHeight: 140,
+    marginTop: 12,
+    padding: space.md,
+    overflow: "hidden",
+  },
+  customFundButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
   },
   heroIcon: {
     width: 30,

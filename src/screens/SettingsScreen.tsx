@@ -38,6 +38,7 @@ import {
   useMonthData,
   useTotal,
   useNecessaryFund,
+  useCustomSavingFunds,
 } from "../lib/storage";
 import { DEFAULT_ROSCA, DEFAULT_BUDGET, DEFAULT_FIXED } from "../lib/budget";
 import { fmt } from "../lib/format";
@@ -47,6 +48,7 @@ import { BudgetConfigSheet } from "../components/BudgetConfigSheet";
 import { FixedItemsSheet } from "../components/FixedItemsSheet";
 import { PageBackground } from "../components/PageBackground";
 import { Txt } from "../components/Txt";
+import { Icon } from "../components/Icon";
 import { OptionPickerSheet } from "../components/OptionPickerSheet";
 import { EditAmountSheet } from "../components/EditAmountSheet";
 import { CategoriesViewerSheet } from "../components/CategoriesViewerSheet";
@@ -97,6 +99,11 @@ export function SettingsScreen() {
   const { themePref, setThemePref } = useThemePref();
   const { total, setManual: setTotal } = useTotal();
   const { fund, setManual: setFund } = useNecessaryFund();
+  const {
+    savingCategories,
+    balances: customSavingBalances,
+    setManual: setCustomSavingAmount,
+  } = useCustomSavingFunds();
 
   const [roscaOpen, setRoscaOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
@@ -106,6 +113,7 @@ export function SettingsScreen() {
   const [catsOpen, setCatsOpen] = useState(false);
   const [editTotalOpen, setEditTotalOpen] = useState(false);
   const [editFundOpen, setEditFundOpen] = useState(false);
+  const [editingCustomFundId, setEditingCustomFundId] = useState<string | null>(null);
 
   // Category editor state (hoisted up so editors are siblings of the manager,
   // not nested — gorhom doesn't reliably handle nested BottomSheetModals)
@@ -283,6 +291,18 @@ export function SettingsScreen() {
               <ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />
             }
           />
+          {savingCategories.map((category) => (
+            <View key={category.id}>
+              <Hairline />
+              <Row
+                icon={<Icon name={category.icon} size={15} color={v7Text.primary} strokeWidth={2.5} />}
+                title={`${category.label} fund`}
+                sub={`${fmt(customSavingBalances[category.id] ?? 0)} · shared savings`}
+                onPress={() => setEditingCustomFundId(category.id)}
+                right={<ChevronRight size={14} color={v7Text.tertiary} strokeWidth={3} />}
+              />
+            </View>
+          ))}
           <Hairline />
           <Row
             icon={
@@ -469,6 +489,17 @@ export function SettingsScreen() {
         accent={v7Accent.fund}
         onClose={() => setEditFundOpen(false)}
         onSave={setFund}
+      />
+      <EditAmountSheet
+        visible={!!editingCustomFundId}
+        title={`Edit ${savingCategories.find(c => c.id === editingCustomFundId)?.label ?? "Savings"} Fund`}
+        hint="This is a subset of Total. Editing it doesn't change Total — they're two separate trackers."
+        initialValue={editingCustomFundId ? (customSavingBalances[editingCustomFundId] ?? 0) : 0}
+        accent={savingCategories.find(c => c.id === editingCustomFundId)?.color}
+        onClose={() => setEditingCustomFundId(null)}
+        onSave={(amount) => {
+          if (editingCustomFundId) setCustomSavingAmount(editingCustomFundId, amount);
+        }}
       />
 
       {/* Preference pickers */}

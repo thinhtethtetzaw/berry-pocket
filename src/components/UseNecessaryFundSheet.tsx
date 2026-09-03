@@ -17,11 +17,22 @@ const FUND_TINT_BORDER = '#DCC9FF';
 interface Props {
   visible: boolean;
   fundBalance: number;
+  title?: string;
+  descriptionPlaceholder?: string;
+  accent?: string;
   onClose: () => void;
   onSave: (w: { amount: number; description: string; date: string }) => void;
 }
 
-export function UseNecessaryFundSheet({ visible, fundBalance, onClose, onSave }: Props) {
+export function UseNecessaryFundSheet({
+  visible,
+  fundBalance,
+  title = 'Use Necessary Fund',
+  descriptionPlaceholder = 'e.g. Hospital, urgent repair',
+  accent = v7Accent.fund,
+  onClose,
+  onSave,
+}: Props) {
   const [amountStr, setAmountStr] = useState('');
   const [desc, setDesc] = useState('');
   const [date, setDate] = useState(todayISO());
@@ -53,7 +64,7 @@ export function UseNecessaryFundSheet({ visible, fundBalance, onClose, onSave }:
           </Pressable>
 
           <View style={S.header}>
-            <Txt variant="headingSm" color={v7Text.primary}>Use Necessary Fund</Txt>
+            <Txt variant="headingSm" color={v7Text.primary}>{title}</Txt>
             <Pressable onPress={onClose} hitSlop={10} style={S.iconBtn}>
               <X size={14} color={v7Text.primary} strokeWidth={2} />
             </Pressable>
@@ -77,14 +88,14 @@ export function UseNecessaryFundSheet({ visible, fundBalance, onClose, onSave }:
 
               {/* Amount — light purple */}
               <View style={[S.amountRow, { backgroundColor: FUND_TINT_BG, borderColor: FUND_TINT_BORDER }]}>
-                <Txt variant="headingMd" color={v7Accent.fund} style={S.amountSymbol}>{currency}</Txt>
+                <Txt variant="headingMd" color={accent} style={S.amountSymbol}>{currency}</Txt>
                 <TextInput
                   value={amountStr}
                   onChangeText={(t) => setAmountStr(t.replace(/[^0-9]/g, ''))}
                   placeholder="0"
-                  placeholderTextColor={v7Accent.fund + '55'}
+                  placeholderTextColor={accent + '55'}
                   keyboardType="number-pad"
-                  style={[S.amountInput, { color: v7Accent.fund }]}
+                  style={[S.amountInput, { color: accent }]}
                 />
               </View>
 
@@ -101,7 +112,7 @@ export function UseNecessaryFundSheet({ visible, fundBalance, onClose, onSave }:
               <TextInput
                 value={desc}
                 onChangeText={setDesc}
-                placeholder="e.g. Hospital, urgent repair"
+                placeholder={descriptionPlaceholder}
                 placeholderTextColor={v7Text.tertiary}
                 style={S.input}
               />
@@ -118,7 +129,7 @@ export function UseNecessaryFundSheet({ visible, fundBalance, onClose, onSave }:
                   disabled={amount <= 0}
                   style={({ pressed }) => [
                     S.btn, S.btnPrimary,
-                    { backgroundColor: amount <= 0 ? '#D8DCE5' : v7Accent.fund, opacity: pressed ? 0.85 : 1 },
+                    { backgroundColor: amount <= 0 ? '#D8DCE5' : accent, opacity: pressed ? 0.85 : 1 },
                   ]}
                 >
                   <Txt variant="buttonMd" color="#FFFFFF">Use Fund</Txt>

@@ -87,7 +87,7 @@ export function TransactionSheet({
     ? mainCategories
     : isIncomeMode
       ? mainCategories.filter((m) => m.type === "in")
-      : mainCategories.filter((m) => m.type === "out");
+      : mainCategories.filter((m) => m.type !== "in");
 
   const subs = subCategories.filter((c) => c.main === main);
 

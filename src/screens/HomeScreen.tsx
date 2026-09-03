@@ -121,20 +121,28 @@ export function HomeScreen() {
       rosca: 0,
       living: 0,
     };
-    for (const tx of transactions) t[tx.main] += tx.amount;
-    return t;
-  }, [transactions]);
+    let customSaving = 0;
+    const savingIds = new Set(
+      mainCategories.filter((m) => m.type === "saving").map((m) => m.id),
+    );
+    for (const tx of transactions) {
+      if (tx.main in t) (t as Record<string, number>)[tx.main] += tx.amount;
+      else if (savingIds.has(tx.main)) customSaving += tx.amount;
+    }
+    return { ...t, customSaving };
+  }, [transactions, mainCategories]);
 
   const totalFixed = fixed.reduce((s, f) => s + f.amount, 0);
-  const totalSpent =
-    totals.necessary +
-    totals.living +
-    totals.rosca +
-    totals.fixed +
-    totals.savings;
+  const incomeIds = new Set(
+    mainCategories.filter((m) => m.type === "in").map((m) => m.id),
+  );
+  const totalSpent = transactions.reduce(
+    (sum, tx) => sum + (incomeIds.has(tx.main) ? 0 : tx.amount),
+    0,
+  );
   // What will be added to "Total Saved" at end of this month — current
   // month's savings + necessary contributions. Already live in `totals`.
-  const endOfMonthDelta = totals.savings + totals.necessary;
+  const endOfMonthDelta = totals.savings + totals.customSaving + totals.necessary;
   const recent = [...transactions]
     .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
     .slice(0, 5);

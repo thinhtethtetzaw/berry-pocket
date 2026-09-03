@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Minus, Plus, ChevronDown } from "lucide-react-native";
+import { Minus, Plus, SlidersHorizontal } from "lucide-react-native";
 import { useTheme } from "../ThemeContext";
 import { palette, radius, space } from "../theme";
 import {
@@ -128,17 +128,21 @@ export function TransactionsScreen() {
     // "Expense" total. The summary cards only count actual outflows.
     let income = 0,
       expense = 0;
+    const savingIds = new Set(
+      mainCategories.filter((m) => m.type === "saving").map((m) => m.id),
+    );
     for (const tx of filtered) {
       if (tx.main === "income") {
         income += tx.amount;
         continue;
       }
       if (tx.main === "savings") continue; // → Total Amount, not expense
+      if (savingIds.has(tx.main)) continue; // custom saving → Total Amount
       if (tx.main === "necessary") continue; // → Necessary Fund, not expense
       expense += tx.amount; // living / fixed / rosca
     }
     return { income, expense };
-  }, [filtered]);
+  }, [filtered, mainCategories]);
 
   const grouped = useMemo(() => {
     const map: Record<string, typeof filtered> = {};
@@ -185,8 +189,7 @@ export function TransactionsScreen() {
           month={month}
           onPrev={() => nav(-1)}
           onNext={() => nav(1)}
-          title="Activity"
-          showMonthNav={false}
+          title={`Activity · ${MONTHS_SHORT[month]} ${year}`}
         />
 
         {/* Summary */}
@@ -249,36 +252,32 @@ export function TransactionsScreen() {
           })()}
         </ScrollView>
 
-        {/* Sub-category dropdown — only shown when a specific main is active
-            and that main has at least one sub-category. Tap to open a
-            bottom-sheet picker (same component used in Settings). */}
+        {/* Sub-category filter trigger — right-aligned pill button. Only
+            shown when a specific main is active and that main has at least
+            one sub-category. Tap to open the OptionPickerSheet. */}
         {filter !== "all" && subsForFilter.length > 0 && (
-          <Pressable
-            onPress={() => setSubPickerOpen(true)}
-            style={({ pressed }) => [
-              styles.subDropdown,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Txt
-              variant="microBold"
-              color={theme.steel}
-              style={styles.subDropdownLabel}
+          <View style={styles.filterBarRow}>
+            <Pressable
+              onPress={() => setSubPickerOpen(true)}
+              style={({ pressed }) => [
+                styles.filterPillBtn,
+                {
+                  borderColor: theme.border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
             >
-              SUB-CATEGORY
-            </Txt>
-            <View style={styles.subDropdownValueRow}>
-              <Txt
-                variant="bodySmMed"
+              <SlidersHorizontal
+                size={14}
                 color={theme.ink}
-                numberOfLines={1}
-                style={{ flex: 1 }}
-              >
-                {subFilterLabel}
+                strokeWidth={2.2}
+              />
+              <Txt variant="bodySmMed" color={theme.ink}>
+                {subFilter === "all" ? "Filters" : subFilterLabel}
               </Txt>
-              <ChevronDown size={14} color={theme.steel} strokeWidth={2.4} />
-            </View>
-          </Pressable>
+              {subFilter !== "all" && <View style={styles.filterDot} />}
+            </Pressable>
+          </View>
         )}
 
         {/* Transaction list */}
@@ -481,24 +480,34 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     borderWidth: 1,
   },
-  // Sub-category dropdown trigger — visually one tier below the main pill
-  // row. Light card-style background with an eyebrow + value + chevron.
-  subDropdown: {
-    backgroundColor: "#F4F5FA",
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  // Right-aligned "Filters" pill button — opens the sub-category picker.
+  filterBarRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
     marginBottom: space.lg,
   },
-  subDropdownLabel: {
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    marginBottom: 2,
-  },
-  subDropdownValueRow: {
+  filterPillBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    // Subtle elevation so it lifts off the page background.
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  filterDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#E66A4A",
+    marginLeft: -2,
   },
   dateHeader: {
     textTransform: "uppercase",

@@ -100,7 +100,7 @@ export function CategoriesViewerSheet({ visible, onClose, onEditMain, onEditSub 
                         )}
                       </View>
                       <Txt variant="micro" color={v7Text.tertiary} style={{ marginTop: 2 }}>
-                        {m.type === 'in' ? 'Income' : 'Expense'} · {subs.length} {subs.length === 1 ? 'sub' : 'subs'}
+                        {m.type === 'in' ? 'Income' : m.type === 'saving' ? 'Savings' : 'Expense'} · {subs.length} {subs.length === 1 ? 'sub' : 'subs'}
                       </Txt>
                     </View>
 
